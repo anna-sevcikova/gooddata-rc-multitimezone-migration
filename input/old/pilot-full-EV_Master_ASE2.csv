@@ -1,0 +1,10 @@
+﻿source_workspace_id;source_attribute;object_title;legacy_object_id;legacy_object_type;aac_lookup_category
+EV_Master_ASE2;segmentlead.leadnextdialtime;LEAD FILTER TEST;;visualizationObject;visualization
+EV_Master_ASE2;segmentlead.leadloadeddts;Lead Loaded Dts TEST;;visualizationObject;visualization
+EV_Master_ASE2;segmentlead.leadlastpassdts;Lead Loaded Dts TEST;;visualizationObject;visualization
+EV_Master_ASE2;segmentlead.leadnextdialtime;Lead Loaded Dts TEST;;visualizationObject;visualization
+EV_Master_ASE2;interactionstarttime.interactionstarthalfhour;Case C TEST;;visualizationObject;visualization
+EV_Master_ASE2;startedtime.startedhhmm;CASE B TEST;;visualizationObject;visualization
+EV_Master_ASE2;interactionstarttime.interactionstarthour;AS TEST Call Duration;;metric;metric
+EV_Master_ASE2;segmentlead.leadlastpassdts;ASE TEST Dashboard;;analyticalDashboard;dashboard
+EV_Master_ASE2;interactionendtime.interactionendhour;ASE TEST Dashboard;;analyticalDashboard;dashboard

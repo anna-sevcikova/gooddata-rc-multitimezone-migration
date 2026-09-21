@@ -1,0 +1,74 @@
+--- instalace
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+--- TEST
+python3 migrate.py self-test
+- výsledek SELF-TEST PASS
+
+--- pripojeni na doménu
+export GD_HOST="https://ringcentral-dev.cloud.gooddata.com"
+export GD_WORKSPACE="<TEST_WORKSPACE_ID>"
+
+read -s GD_TOKEN
+export GD_TOKEN
+#pustit a vlozit token, pro restore -> unset GD_TOKEN
+#kontrola např. echo "$GD_HOST"
+
+--------------------- predtim nez jdeme vytvaret plan si muzeme zkontrolovat, jestli mame scope spravne (ale bacha trva to)
+--- generuje komplet novy scope (jde tedy pak vyuzit bez uprav jako input)
+python3 migrate.py discover \
+  --output input/discovered-scope-EV_Master_ASE2.csv
+
+-- podporovane input formaty viz. soubory platform-export.csv nebo discovered-scope-EV_Master_TZ_old.csv (oboje je ok, soucasti kodu je "konvertor")
+
+--- spusteni plánu
+python3 migrate.py \
+  --scope input/pilot-scope.csv \
+  plan
+
+vytvori:
+runs/<timestamp>/
+  backups/
+  proposed/
+  plan.json
+  plan.md
+
+Co je potreba zkontrolovat:
+BLOCKED: 0 u známých případů;
+správné exact-title lookupy;
+správně nalezené source occurrences;
+target dataset/label validation;
+proposed JSON pro metric;
+proposed JSON pro Case B;
+proposed JSON pro Case C;
+unrestricted date filter;
+dashboard filterContext;
+jeden nový Lead rule;
+jeden nový startedhhmm / startedhalfhour rule.
+
+--- znova kontrola pred spustenim
+echo "$GD_HOST"
+echo "$GD_WORKSPACE"
+
+--- vse ok, spusteni apply
+python3 migrate.py apply \
+  --confirm-host "$GD_HOST" \
+  --confirm-workspace "$GD_WORKSPACE"
+
+--- kontrola
+python3 migrate.py verify
+
+--- pokud chci byt jooo pecliva, pustim znovu krok s planem a mela bych videt:
+BLOCKED rows:       0
+AMBIGUOUS rows:     0
+Planned API writes: 0
+NOT FOUND zůstanou stejné a původně READY řádky by měly přejít do NO_OCCURRENCE / NO CHANGE, protože source už bude pryč
+
+---- rollback z konkretniho backupu
+python3 migrate.py \
+  --run runs/20260816-xxxxxx+0200 \
+  rollback \
+  --confirm-host "$GD_HOST" \
+  --confirm-workspace "$GD_WORKSPACE"

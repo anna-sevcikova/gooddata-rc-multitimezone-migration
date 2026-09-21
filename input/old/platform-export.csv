@@ -1,0 +1,146 @@
+﻿okmeucswhe6y2aev14eildz76of58fmh;attr.account.accountenddate;Account Taxonomy;3841337;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.account.accountenddate;Account Overview;3840343;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.account.accountstartdate;EV Inactive Accounts;3972223;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.account.accountstartdate;Account Taxonomy;3841337;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.account.accountstartdate;Account Overview;3840343;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstateendtime;Agent State Change Raw;3840045;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstateendtime;Agent States Transition;3839765;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Digital Non-Working State;3959342;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Agent States Analysis;3962744;visualizationObject;no
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;RNA State;3909776;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Preview State;3980670;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Digital Presented State;3921353;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Training State;3909774;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Agent State Change Raw;3840045;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Offline State;3909777;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Away State;3909783;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Suspect State;3909775;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Transition State;3909773;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Agent States Transition;3839765;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Monitoring State;3909778;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Engaged State;3909780;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Digital RNA State;3921354;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Aux-Unavail-Offhook State;3962776;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Lunch State;3909779;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Digital Engaged State;3921351;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Agent Activity Overview;3962668;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Digital Available State;3921352;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Available State;3909781;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Aux-Unavail-No-Offhook State;3962775;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Working State;3909772;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.agentstate.agentstatestarttime;Break State;3909782;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.customfieldscripting.lastmodified;Agent script test;3954234;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionendtime.interactionendquarterhour;Import1;3960302;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthhmm;[DEMO] Avg per Hour;3840253;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Contacts per Hour Trend;3910563;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Dials per Hour Forecast - 12 Months;3909746;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Live Answers per Hour Forecast - 9 Months;3909759;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Live Answers per Hour Forecast - 12 Months;3909758;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Dials per Hour;3840252;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Completes per Hour Forecast - 6 Months;3909764;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Dials per Hour Forecast - 6 Months;3909748;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Answers per Hour Forecast - 6 Months;3909756;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Dials per Hour Forecast - 3 Months;3909749;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Outbound Performance;1420;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Live Answers per Hour;3840263;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Import to the EV Master;3968169;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Success per Hour Forecast - 3 Months;3909745;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Live Answers per Hour Forecast - 3 Months;3909761;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Answers per Hour Forecast - 9 Months;3909755;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Completes per Hour Forecast - 9 Months;3909763;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Success per Hour;3840255;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Answers per Hour Trend;3910564;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Contacts per Hour Forecast - 12 Months;3909750;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Outbound Performance;1465;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Contacts per Hour Forecast - 6 Months;3909752;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Completes per Hour;3840256;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Success per Hour Forecast - 12 Months;3909742;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Success per Hour Trend;3910561;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Contacts per Hour Forecast - 3 Months;3909753;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Completes per Hour Trend;3910566;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Live Answers per Hour Forecast - 6 Months;3909760;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Success per Hour Forecast - 9 Months;3909743;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Answers per Hour Forecast - 3 Months;3909757;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Completes per Hour Forecast - 12 Months;3909762;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Dials per Hour Forecast - 9 Months;3909747;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Live Answers per Hour Trend;3910565;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Answers per Hour;3840254;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Success per Hour Forecast - 6 Months;3909744;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Contacts per Hour;3840257;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Answers per Hour Forecast - 12 Months;3909754;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;[DEMO] Avg per Hour;3840253;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Dials per Hour Trend;3910562;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Contacts per Hour Forecast - 9 Months;3909751;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstarthour;Avg Completes per Hour Forecast - 3 Months;3909765;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstartquarterhour;Inbound Interactions Volume;3971788;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.interactionstarttime.interactionstartquarterhour;Queue Inbound Interaction per Day of Week and Time of Day;3971786;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Interactions Overview;3839741;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;[Mitel Group] Interaction Details;3962636;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Queue Voice Callback;3975587;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Callback Interaction Details;3976430;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Customer Journey Analytics;3959718;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Overflow Queue Overview;3853221;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Overflow Queue Interaction Details;3853218;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Interaction Details;988804;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Interaction Journey Overview;3959329;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Callback Request Execution Time;3973777;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Dialer Result Download;3840042;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;First Contact Resolution Details;3969263;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;_Callback Interactions Accepted Start Time;3973775;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Customer Journey (plugin data);3959330;visualizationObject;no
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionendtime;Inbound Interactions Overview;1440;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;First Contact Resolution Details;3969263;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Interaction Journey Overview;3959329;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Callback Request Execution Time;3973777;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Interaction Details;988804;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Customer Journey (plugin data);3959330;visualizationObject;no
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Interactions Overview;3839741;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;_Callback Interactions Executed Start Time;3973776;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Overflow Queue Overview;3853221;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Dialer Result Download;3840042;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Report 3;3920532;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Agent Conduct;3837479;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Inbound Interactions Overview;1440;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Overflow Queue Interaction Details;3853218;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Callback Interaction Details;3976430;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Customer Journey Analytics;3959718;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Copy 1 of _Callback Interactions Executed Start Time;3973779;metric;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;[Mitel Group] Interaction Details;3962636;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Ring No Answer Call Details;3837500;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualinteractionstarttime;Queue Voice Callback;3975587;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualsegmentendtime;Inbound Call Detail;3840046;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualsegmentendtime;Customer Journey Analytics;3959718;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualsegmentendtime;[Mitel Group] Interaction Lifecycle;3962637;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualsegmentendtime;Interaction Lifecycle;3959696;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualsegmentstarttime;[Mitel Group] Interaction Lifecycle;3962637;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualsegmentstarttime;Interaction Lifecycle;3959696;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualsegmentstarttime;Customer Journey Analytics;3959718;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.actualsegmentstarttime;Inbound Call Detail;3840046;visualizationObject;yes
+okmeucswhe6y2aev14eildz76of58fmh;attr.segment.ucinteractiontime;[Mitel Group] Interaction Lifecycle;3962637;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Hourly Inbound Interaction Statistics;3845891;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Avg Handle Time by Channel Time by Hour;152440;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Dialer Performance and Penetration;1462;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Leads Analysis;3839246;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Leads Analysis - Table;3839248;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Avg Queue Time by Channel Type by Hour;152444;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Hourly Dialer Disposition;1460;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Dialer Penetration Performance Analysis;3840561;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Agents Handling Interactions by Channel Type Trend by Hour;152446;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Hourly Inbound Statistics;1459;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Interactions by Channel Type Trend by Hour;152448;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Account Overview;3840343;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Omnichannel Overview;152450;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Hourly Inbound Statistics;1457;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Leads Analysis - Heatmap;3839247;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedhour;Agent Occupancy Trend by Hour;152442;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Hourly Inbound Time Trends;1451;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Inbound Workflow Overview;1062952;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Agent Script Detail (with Custom Fields);3851837;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Hourly Inbound Call Trends;1453;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Dialer Performance and Penetration;1462;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Agent Conduct and RNA: Agent RNA UIIs;3837466;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Test: Call Details;1450;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Workflow Detail (with Custom Fields);1062949;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Hourly Dialer Disposition Trend;1455;visualizationObject;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Hourly Inbound Statistics;1459;analyticalDashboard;n/a
+okmeucswhe6y2aev14eildz76of58fmh;attr.startedtime.startedquarterhour;Workflow Detail (with Talk Time);1062950;visualizationObject;n/a

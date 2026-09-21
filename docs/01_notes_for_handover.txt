@@ -1,0 +1,110 @@
+Co to dělá:
+Migrace legacy time atributů v GoodData Cloud přes Entity API
+
+Dva klíčové soubory:
+- config/replacement-rules.csv = HOW (jak se legacy source mapuje)
+- input/*.csv (scope) = WHERE (které objekty smí tool sahat)
+
+
+--- připojení
+export GD_HOST="https://ringcentral-dev.cloud.gooddata.com"
+export GD_WORKSPACE="<TEST_WORKSPACE_ID>"
+read -s GD_TOKEN && export GD_TOKEN
+
+-----------------
+STEP 1: zajistit scope (whitelist objektů)
+a) ručně / Platform export, nebo
+b) vygenerovat z workspace přes discover mode:
+
+python3 migrate.py discover \
+  --output input/discovered-scope-EV_Master_RVA.csv
+
+Discover skenuje a vytvoří nový CSV (nic nemigruje).
+Oba formáty jdou rovnou do --scope (parser v config.py):
+- input/platform-export.csv (raw Platform export, bez hlavičky)
+- input/old/discovered-scope-*.csv (normalized, s hlavičkou)
+Default scope: input/workspace-scope.csv
+
+-----------------
+STEP 2: plán (žádné zápisy do API)
+python3 migrate.py --scope input/workspace-scope.csv plan
+
+vytvoří zápis do složky runs/<timestamp>/ (backups/, proposed/, plan.json, plan.md)
+→ zkontroluj plan.md (BLOCKED/AMBIGUOUS = 0)
+
+-----------------
+STEP 3: apply - samotna migrace
+python3 migrate.py apply \
+  --confirm-host "$GD_HOST" \
+  --confirm-workspace "$GD_WORKSPACE"
+
+-----------------
+STEP 4: verify
+python3 migrate.py verify
+
+Volitelně znovu plan — u úspěšné migrace:
+BLOCKED/AMBIGUOUS = 0, Planned API writes = 0
+(původní READY → NO_OCCURRENCE / no change)
+
+Rollback z konkrétního runu:
+python3 migrate.py \
+  --run runs/20260816-xxxxxx+0200 \
+  rollback \
+  --confirm-host "$GD_HOST" \
+  --confirm-workspace "$GD_WORKSPACE"
+
+-----------------
+Rychly prehled python souboru (co delaji + kdy):
+- migrate.py                  = CLI vstup; všechny stepy
+
+- migration_tool/config.py    = načte rules + scope (oba CSV); STEP 1+2
+- migration_tool/discovery.py = sken workspace → scope CSV; STEP 1 (discover)
+- migration_tool/transform.py = převod payloadů (metric/viz/dashboard); STEP 2 (plan)
+- migration_tool/api.py       = volání GoodData Entity API; STEP 1–4 + rollback
+- migration_tool/runner.py    = orchestrace + runs/; STEP 2–4 + rollback
+
+
+-----------------
+-----------------
+-----------------
+config/replacement-rules.csv (HOW)
+
+Sdílená mapa: legacy time source → nová date dimension / label / granularita.
+Delimiter: ;  |  jedna řádka = jeden source_attribute (nesmí se opakovat).
+Discover i migrace znají jen to, co je tady — nic mimo CSV se nehledá/nemigruje.
+
+Sloupce:
+  source_attribute           = logický ID legacy atributu (BEZ prefixu attr.) → klíč whitelistu / párování se scope
+  source_label               = displayForm/label ID v API, pokud ≠ source_attribute (prázdné = bere se source_attribute)
+  target_date_dimension      = cílová date dimension v Cloud
+  visual_default_granularity = granularita pro viz/dashboard fieldy (Case A)
+  visual_default_label       = cílový label vizuálu (nebo odvozeno z dim+granularity)
+  visual_default_title       = alias/title po migraci fieldů
+  day_reuse_enabled          = true/false — Case B: místo legacy field použít; existující day field na stejné date dim
+  day_reuse_granularity      = granularita day-reuse labelu (povinné při true)
+  day_reuse_label            = cílový day-reuse label (nebo odvozeno)
+  day_reuse_title            = title day-reuse fieldu (povinné při true)
+  metric_granularity         = granularita pro MAQL metriky
+  metric_label               = cílový label v MAQL (nebo odvozeno)
+
+Jak se to používá:
+  metrics        → vždy metric_label (+ metric_granularity)
+  viz fieldy     → visual_default_* ; pokud day_reuse_enabled=true a ve vizu
+                   už je day field stejné dimenze → Case B (day_reuse_*)
+  viz/dashboard  → filtry přes source_label → visual_default_label
+
+Příklad bez day reuse (čistá výměna labelu):
+  account.accountenddate;;account_end_date;SECOND;...;false;;;;SECOND;...
+
+Příklad s day reuse (time-of-day + reuse day field):
+  agentstate.agentstatestarttime;;dt_callstartdate;SECOND_OF_DAY;...;true;SECOND;...;Started;...
+
+Kdy editovat:
+  - nový legacy time source ve workspace → nová řádka
+  - jiná cílová date dim / granularita / title → upravit příslušné sloupce
+  - source_attribute ≠ source_label v API → vyplnit source_label
+Po změně vždy znovu plan (případně discover), než apply.
+
+Default path: config/replacement-rules.csv
+Override: python3 migrate.py --rules <path> ...
+
