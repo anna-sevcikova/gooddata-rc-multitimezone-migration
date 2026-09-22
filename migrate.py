@@ -408,6 +408,13 @@ def cmd_self_test(_: argparse.Namespace) -> None:
         "dashboard": {"d1"},
     }
 
+    # Scope lookup: id wins over ambiguous title, title is the fallback
+    from migration_tool.runner import resolve_scope_object
+    same_title = [synthetic_entity(i, "visualizationObject", "Interactions", {})["data"] for i in ("a", "b", "c")]
+    assert [x["id"] for x in resolve_scope_object(same_title, "Interactions", {"b"})] == ["b"]
+    assert len(resolve_scope_object(same_title, "Interactions", {"legacy-only-id"})) == 3
+    assert len(resolve_scope_object(same_title, "Interactions", set())) == 3
+
     print("SELF-TEST PASS")
     print("- metric MAQL")
     print("- visualization Case A")

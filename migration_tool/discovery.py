@@ -442,12 +442,10 @@ def discover_workspace_scope(
 
                 title = entity_title(entity)
                 if title_counts.get(title, 0) > 1:
-                    sources = ", ".join(sorted(aggregate_occurrences(occurrences)))
                     warnings.append(
                         f"{category} title {title!r} is ambiguous ({title_counts[title]} exact objects); "
-                        f"discovered source(s) {sources} were NOT emitted to scope"
+                        f"plan resolves it by legacy_object_id"
                     )
-                    continue
 
                 rows.extend(_rows_for_entity(
                     workspace=api.workspace,

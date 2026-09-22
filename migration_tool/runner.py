@@ -105,6 +105,17 @@ def exact_title_matches(items: list[dict[str, Any]], title: str) -> list[dict[st
     return [x for x in items if object_title_from_data(x) == title]
 
 
+def resolve_scope_object(
+    items: list[dict[str, Any]], title: str, object_ids: set[str]
+) -> list[dict[str, Any]]:
+    """Prefer a single exact id match (scope legacy_object_id == Cloud id, i.e.
+    migrated with --keep-original-ids); otherwise fall back to exact title."""
+    by_id = [x for x in items if object_id_from_data(x) in object_ids]
+    if len(by_id) == 1:
+        return by_id
+    return exact_title_matches(items, title)
+
+
 def _target_exists(api: GoodDataApi, collection: str, object_id: str) -> bool:
     return api.try_get_entity(collection, object_id) is not None
 
@@ -260,7 +271,8 @@ def plan(
 
     for index, ((category, title), rows) in enumerate(grouped.items(), start=1):
         collection = COLLECTION_BY_CATEGORY[category]
-        matches = exact_title_matches(listed_by_category[category], title)
+        scope_ids = {r.legacy_object_id for r in rows if r.legacy_object_id}
+        matches = resolve_scope_object(listed_by_category[category], title, scope_ids)
         obj_report: dict[str, Any] = {
             "category": category,
             "title": title,
