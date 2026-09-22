@@ -90,8 +90,18 @@ class ScopeRow:
     category: str
 
     @property
+    def object_identity(self) -> str:
+        """Stable key for grouping one analytical object across scope rows.
+
+        Prefer ``legacy_object_id`` when present (Cloud Entity ID from discover, or
+        Platform provenance ID from exports). Fall back to title only when the ID
+        column is empty.
+        """
+        return self.legacy_object_id or self.object_title
+
+    @property
     def object_key(self) -> tuple[str, str]:
-        return self.category, self.object_title
+        return self.category, self.object_identity
 
 
 def _truthy(value: str) -> bool:
@@ -194,6 +204,7 @@ def _scope_row_from_values(
     source = _normalize_source_attribute(source_attribute)
     title = object_title.strip()
     normalized_category = category.strip().lower()
+    object_id = legacy_object_id.strip()
 
     if source not in rules:
         raise ConfigError(
@@ -206,7 +217,10 @@ def _scope_row_from_values(
     if not title:
         raise ConfigError(f"Workspace scope row {row_number}: object_title is empty")
 
-    key = (normalized_category, title, source)
+    # Deduplicate per concrete object (ID when present) + source, so multiple
+    # Cloud clones that share a title can all be whitelisted.
+    identity = object_id or title
+    key = (normalized_category, identity, source)
     if key in seen:
         raise ConfigError(
             f"Workspace scope row {row_number}: duplicate whitelist pair {key!r}"
@@ -218,7 +232,7 @@ def _scope_row_from_values(
         source_workspace_id=source_workspace_id.strip(),
         source_attribute=source,
         object_title=title,
-        legacy_object_id=legacy_object_id.strip(),
+        legacy_object_id=object_id,
         legacy_object_type=legacy_object_type.strip(),
         category=normalized_category,
     )

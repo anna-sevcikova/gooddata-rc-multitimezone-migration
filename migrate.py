@@ -156,8 +156,17 @@ def cmd_self_test(_: argparse.Namespace) -> None:
                 ],
             }],
             "filters": [],
-            "sorts": [],
-            "properties": {},
+            "sorts": [{
+                "attributeSortItem": {
+                    "attributeIdentifier": "legacy",
+                    "direction": "asc",
+                }
+            }],
+            "properties": {
+                "controls": {
+                    "columnWidths": [{"attributeIdentifier": "legacy", "width": 120}],
+                }
+            },
         },
     )
     result = transform_visualization(vis_b, [scope_row(2, "old.time", "Case B", "visualization")], {"old.time": rb})
@@ -167,6 +176,11 @@ def cmd_self_test(_: argparse.Namespace) -> None:
     assert attrs[0][4]["localIdentifier"] == "day1"
     assert display_form_id(attrs[0][4]) == "new.second"
     assert attrs[0][4]["alias"] == "Interaction Start"
+    proposed_content = entity_content(result.proposed)
+    assert proposed_content["sorts"][0]["attributeSortItem"]["attributeIdentifier"] == "day1"
+    assert proposed_content["properties"]["controls"]["columnWidths"][0]["attributeIdentifier"] == "day1"
+    assert "legacy" not in str(proposed_content)
+    assert any("remapped" in outcome.detail for outcome in result.outcomes)
     assert not verify_checks(result.proposed, result.checks)
 
     # Visualization filter conversion, preserving existing unrelated date filter.
@@ -377,6 +391,43 @@ def cmd_self_test(_: argparse.Namespace) -> None:
         assert normalized[0].source_attribute == "old.hour"
         assert normalized[0].category == "visualization"
 
+        # Duplicate titles are allowed when Cloud Entity IDs differ.
+        clones_scope = Path(tmpdir) / "clones.csv"
+        clones_scope.write_text(
+            "source_workspace_id;source_attribute;object_title;legacy_object_id;"
+            "legacy_object_type;aac_lookup_category\n"
+            "ws;old.hour;Clone of: Interaction Details;idAAA;visualizationObject;visualization\n"
+            "ws;old.hour;Clone of: Interaction Details;idBBB;visualizationObject;visualization\n",
+            encoding="utf-8",
+        )
+        clones = load_scope(clones_scope, {"old.hour": r})
+        assert len(clones) == 2
+        from migration_tool.config import group_scope
+        grouped_clones = group_scope(clones)
+        assert set(grouped_clones) == {
+            ("visualization", "idAAA"),
+            ("visualization", "idBBB"),
+        }
+
+    from migration_tool.runner import resolve_listed_object
+    listed = [
+        {"id": "idAAA", "attributes": {"title": "Clone of: Interaction Details"}},
+        {"id": "idBBB", "attributes": {"title": "Clone of: Interaction Details"}},
+    ]
+    status, match, _ = resolve_listed_object(
+        listed=listed,
+        title="Clone of: Interaction Details",
+        legacy_object_id="idBBB",
+    )
+    assert status == "FOUND_BY_ID"
+    assert match is not None and match["id"] == "idBBB"
+    status, match, _ = resolve_listed_object(
+        listed=listed,
+        title="Clone of: Interaction Details",
+        legacy_object_id="",
+    )
+    assert status == "AMBIGUOUS" and match is None
+
     # Discover helpers: entry points + graph candidate extraction.
     dep_rules = {
         rd_half.source_attribute: rd_half,
@@ -413,11 +464,13 @@ def cmd_self_test(_: argparse.Namespace) -> None:
     print("- visualization Case A")
     print("- visualization Case C")
     print("- visualization Case B DAY reuse")
+    print("- visualization Case B leftover localIdentifier remap (sort/config)")
     print("- visualization attribute_filter -> unrestricted date filter")
     print("- dashboard filterContext conversion + dashboard config cleanup")
     print("- scope discovery + unscoped-known-legacy diagnostics")
     print("- raw Platform export + normalized scope input compatibility")
     print("- discover entry points + graph candidate extraction")
+    print("- ID-based scope grouping + ambiguous-title resolution")
 
 
 def build_parser() -> argparse.ArgumentParser:

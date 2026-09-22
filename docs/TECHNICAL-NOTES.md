@@ -84,7 +84,16 @@ The existing V1.3 scope parser ignores these extra columns, so generated output 
 
 ## Ambiguous titles
 
-Migration lookup is intentionally exact `title + category`. Therefore discovery cannot safely create a scope row for an object whose title is duplicated in the same category. Such occurrences are omitted and written to the discovery warnings file.
+Migration lookup prefers a live Cloud ``legacy_object_id`` when present in scope,
+then falls back to exact ``title + category``.
+
+``discover`` therefore **emits** rows even when multiple objects share a title; it
+warns, but keeps each clone distinguishable by Entity ID. ``plan`` resolves those
+rows by ID.
+
+AMBIGUOUS remains only when the title is duplicated **and** the scope row has no
+usable live Cloud ID (for example a Platform-only provenance ID that is not an
+Entity ID in the target workspace).
 
 ## UNSCOPED KNOWN LEGACY warning
 
@@ -120,6 +129,11 @@ Target date dimension absent -> replace source field in place with mapped defaul
 ### Case B
 
 Exactly one target DAY field -> reuse that DAY field as chronological SECOND/MINUTE/HOUR and remove source field.
+
+After the source field is removed, any leftover exact string references to its
+``localIdentifier`` (sorts, columnWidths, properties, …) are remapped onto the
+reused DAY field's ``localIdentifier``. If a reference cannot be remapped cleanly
+(still present as a substring elsewhere), the object stays BLOCKED.
 
 ### Case C
 

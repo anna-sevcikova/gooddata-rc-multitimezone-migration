@@ -14,7 +14,7 @@ export GD_WORKSPACE="<TEST_WORKSPACE_ID>"
 read -s GD_TOKEN
 export GD_TOKEN
 #pustit a vlozit token, pro restore -> unset GD_TOKEN
-#kontrola např. echo "$GD_HOST"
+#kontrola např. echo "$GD_WORKSPACE"
 
 --------------------- predtim nez jdeme vytvaret plan si muzeme zkontrolovat, jestli mame scope spravne
 --- generuje komplet novy scope (jde tedy pak vyuzit bez uprav jako input)
@@ -38,7 +38,7 @@ runs/<timestamp>/
 
 Co je potreba zkontrolovat:
 BLOCKED: 0 u známých případů;
-správné exact-title lookupy;
+správné lookupy (Cloud ID, jinak exact-title);
 správně nalezené source occurrences;
 target dataset/label validation;
 proposed JSON pro metric;
@@ -54,7 +54,9 @@ echo "$GD_HOST"
 echo "$GD_WORKSPACE"
 
 --- vse ok, spusteni apply
-python3 migrate.py apply \
+python3 migrate.py \
+  --run runs/EV_Master_Final-20260922-125404+0200 \ -- selected plan
+  apply \
   --confirm-host "$GD_HOST" \
   --confirm-workspace "$GD_WORKSPACE"
 
