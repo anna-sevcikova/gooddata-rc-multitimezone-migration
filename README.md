@@ -134,7 +134,10 @@ It generates **one row per object + logical `source_attribute`**, even when the 
 
 Discovery never migrates anything and never expands an existing scope automatically.
 
-If a discovered object title is ambiguous inside the same category, that row is not emitted and a sibling `*.csv.warnings.txt` file is created. Dashboard/filterContext shapes that cannot be safely resolved are also reported there.
+If a discovered object title is duplicated inside the same category, discover still
+emits a scope row per object ID and notes the clash in `*.csv.warnings.txt`.
+`plan` then resolves those rows by `legacy_object_id`. Dashboard/filterContext
+shapes that cannot be safely resolved are also reported in the warnings file.
 
 ## 3. Plan
 

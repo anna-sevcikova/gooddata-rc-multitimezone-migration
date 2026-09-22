@@ -346,9 +346,9 @@ def _finalize_discovered_scope(
         r.legacy_object_id,
     ))
 
-    keys: set[tuple[str, str, str]] = set()
+    keys: set[tuple[str, str, str, str]] = set()
     for row in rows:
-        key = (row.category, row.object_title, row.source_attribute)
+        key = (row.category, row.object_title, row.source_attribute, row.legacy_object_id)
         if key in keys:
             raise DiscoveryError(f"Internal discovery duplicate scope key: {key!r}")
         keys.add(key)
@@ -445,9 +445,8 @@ def discover_workspace_scope(
                     sources = ", ".join(sorted(aggregate_occurrences(occurrences)))
                     warnings.append(
                         f"{category} title {title!r} is ambiguous ({title_counts[title]} exact objects); "
-                        f"discovered source(s) {sources} were NOT emitted to scope"
+                        f"emitting by object id {object_id} for source(s) {sources}"
                     )
-                    continue
 
                 rows.extend(_rows_for_entity(
                     workspace=api.workspace,

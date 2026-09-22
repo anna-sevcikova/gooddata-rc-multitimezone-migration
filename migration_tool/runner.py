@@ -105,6 +105,63 @@ def exact_title_matches(items: list[dict[str, Any]], title: str) -> list[dict[st
     return [x for x in items if object_title_from_data(x) == title]
 
 
+def index_by_id(items: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for item in items:
+        object_id = object_id_from_data(item)
+        if object_id:
+            out[object_id] = item
+    return out
+
+
+def resolve_listed_object(
+    *,
+    listed: list[dict[str, Any]],
+    title: str,
+    legacy_object_id: str,
+) -> tuple[str, dict[str, Any] | None, str]:
+    """Resolve a scoped object from the listed collection.
+
+    Preference order:
+    1. ``legacy_object_id`` when it matches a live Entity ID (handles duplicate titles)
+    2. exact unique title match
+    3. NOT_FOUND / AMBIGUOUS
+
+    Returns ``(status, listed_item_or_none, detail)``.
+    """
+    by_id = index_by_id(listed)
+    if legacy_object_id and legacy_object_id in by_id:
+        return (
+            "FOUND_BY_ID",
+            by_id[legacy_object_id],
+            f"Resolved by legacy_object_id={legacy_object_id}",
+        )
+
+    matches = exact_title_matches(listed, title)
+    if len(matches) == 1:
+        detail = "Exact title+category match"
+        if legacy_object_id:
+            detail = (
+                f"Exact title+category match "
+                f"(legacy_object_id={legacy_object_id!r} not present in workspace list)"
+            )
+        return "FOUND_BY_TITLE", matches[0], detail
+    if len(matches) == 0:
+        if legacy_object_id:
+            return (
+                "NOT_FOUND",
+                None,
+                f"No object with id={legacy_object_id!r} and no exact title+category match",
+            )
+        return "NOT_FOUND", None, "No exact title+category match"
+    return (
+        "AMBIGUOUS",
+        None,
+        f"{len(matches)} exact title+category matches; provide a live Cloud "
+        f"legacy_object_id to disambiguate",
+    )
+
+
 def _target_exists(api: GoodDataApi, collection: str, object_id: str) -> bool:
     return api.try_get_entity(collection, object_id) is not None
 
@@ -258,21 +315,41 @@ def plan(
         "BLOCKED": 0,
     }
 
-    for index, ((category, title), rows) in enumerate(grouped.items(), start=1):
+    for index, ((category, identity), rows) in enumerate(grouped.items(), start=1):
         collection = COLLECTION_BY_CATEGORY[category]
-        matches = exact_title_matches(listed_by_category[category], title)
+        title = rows[0].object_title
+        # Groups are keyed by object identity (ID when present); all rows in a
+        # group share the same legacy_object_id when discover/Platform export
+        # provided one.
+        legacy_ids = {row.legacy_object_id for row in rows if row.legacy_object_id}
+        if len(legacy_ids) > 1:
+            raise RunnerError(
+                f"Scope group {category!r}/{identity!r} mixes multiple legacy_object_id "
+                f"values: {sorted(legacy_ids)}"
+            )
+        legacy_object_id = next(iter(legacy_ids)) if legacy_ids else ""
+
+        lookup_status, match, lookup_detail = resolve_listed_object(
+            listed=listed_by_category[category],
+            title=title,
+            legacy_object_id=legacy_object_id,
+        )
         obj_report: dict[str, Any] = {
             "category": category,
             "title": title,
+            "object_identity": identity,
             "scope_rows": [r.row_number for r in rows],
             "lookup_status": None,
+            "lookup_detail": lookup_detail,
             "id": None,
             "row_outcomes": [],
             "write_keys": [],
         }
         print(f"[{index:03d}/{len(grouped):03d}] {category:<13} {title}")
+        if legacy_object_id:
+            print(f"  identity: {legacy_object_id}")
 
-        if len(matches) == 0:
+        if lookup_status == "NOT_FOUND":
             obj_report["lookup_status"] = "NOT_FOUND"
             for row in rows:
                 outcome = {
@@ -280,7 +357,7 @@ def plan(
                     "legacy_object_id": row.legacy_object_id,
                     "source_attribute": row.source_attribute,
                     "status": "NOT_FOUND",
-                    "detail": "No exact title+category match",
+                    "detail": lookup_detail,
                 }
                 obj_report["row_outcomes"].append(outcome)
                 row_counts["NOT_FOUND"] += 1
@@ -288,7 +365,8 @@ def plan(
             print("  NOT FOUND")
             continue
 
-        if len(matches) > 1:
+        if lookup_status == "AMBIGUOUS":
+            matches = exact_title_matches(listed_by_category[category], title)
             obj_report["lookup_status"] = "AMBIGUOUS"
             obj_report["candidate_ids"] = [object_id_from_data(x) for x in matches]
             for row in rows:
@@ -297,22 +375,32 @@ def plan(
                     "legacy_object_id": row.legacy_object_id,
                     "source_attribute": row.source_attribute,
                     "status": "AMBIGUOUS",
-                    "detail": f"{len(matches)} exact title+category matches",
+                    "detail": lookup_detail,
                 }
                 obj_report["row_outcomes"].append(outcome)
                 row_counts["AMBIGUOUS"] += 1
             plan_objects.append(obj_report)
-            print(f"  AMBIGUOUS: {len(matches)} matches")
+            print(f"  AMBIGUOUS: {lookup_detail}")
             continue
 
-        object_id = object_id_from_data(matches[0])
+        assert match is not None
+        object_id = object_id_from_data(match)
         obj_report["lookup_status"] = "FOUND"
         obj_report["id"] = object_id
+        if lookup_status == "FOUND_BY_ID":
+            print(f"  FOUND by id ({object_id})")
+        else:
+            print(f"  FOUND by title ({object_id})")
 
         try:
             entity = api.get_entity(collection, object_id)
-            if entity_title(entity) != title or entity_id(entity) != object_id:
-                raise RunnerError("Entity identity mismatch after exact lookup")
+            if entity_id(entity) != object_id:
+                raise RunnerError("Entity identity mismatch after lookup")
+            if entity_title(entity) != title:
+                raise RunnerError(
+                    f"Entity title mismatch after lookup: scope title {title!r} "
+                    f"!= live title {entity_title(entity)!r} for id {object_id}"
+                )
             if entity_type(entity) != TYPE_BY_CATEGORY[category]:
                 raise RunnerError(
                     f"Entity type mismatch: expected {TYPE_BY_CATEGORY[category]}, got {entity_type(entity)}"

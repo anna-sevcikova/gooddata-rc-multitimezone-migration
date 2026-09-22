@@ -118,6 +118,33 @@ def json_contains_token(value: Any, token: str) -> bool:
     return False
 
 
+def remap_exact_string_tokens(value: Any, old: str, new: str) -> int:
+    """Replace exact string values ``old`` with ``new`` anywhere in a JSON tree.
+
+    Dict keys are left unchanged. Returns the number of replaced values.
+    """
+    if not old or old == new:
+        return 0
+    replaced = 0
+    if isinstance(value, dict):
+        for key, child in list(value.items()):
+            if isinstance(child, str):
+                if child == old:
+                    value[key] = new
+                    replaced += 1
+            else:
+                replaced += remap_exact_string_tokens(child, old, new)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            if isinstance(child, str):
+                if child == old:
+                    value[index] = new
+                    replaced += 1
+            else:
+                replaced += remap_exact_string_tokens(child, old, new)
+    return replaced
+
+
 def filter_rows(content: dict[str, Any]) -> list[tuple[int, dict[str, Any]]]:
     filters = content.get("filters") or []
     if not isinstance(filters, list):
@@ -375,20 +402,32 @@ def _transform_visual_field(
             )
         bi, ii, _, _, _ = source_rows[0]
         remove_item(content, bi, ii)
+        # Case B collapses two fields into one localIdentifier. Sorts / columnWidths /
+        # properties often still point at the removed source id — remap those exact
+        # references onto the reused DAY field instead of blocking.
+        remapped = remap_exact_string_tokens(content, source_local_id, day_local_id)
         if json_contains_token(content, source_local_id):
             raise TransformError(
                 f"{row.source_attribute}: removed source field localIdentifier {source_local_id} "
-                "is still referenced elsewhere (sort/config/bucket dependency)"
+                "is still referenced elsewhere (sort/config/bucket dependency) after remap "
+                f"to {day_local_id}"
             )
-        return True, (
+        detail = (
             f"Case B: reuse {rule.target_date_dimension}.day as label/{rule.day_reuse_label_id}; "
             f"remove source field {source_local_id}"
-        ), {
+        )
+        if remapped:
+            detail += (
+                f"; remapped {remapped} leftover reference(s) "
+                f"{source_local_id} -> {day_local_id}"
+            )
+        return True, detail, {
             "kind": "visual_field",
             "source_attribute": row.source_attribute,
             "source_label_id": rule.source_label_id,
             "target_label_id": rule.day_reuse_label_id,
             "target_local_ids": [day_local_id],
+            "remapped_local_id_references": remapped,
         }
 
     # Case A or Case C: source is replaced in place. Existing non-DAY target usages remain untouched.
