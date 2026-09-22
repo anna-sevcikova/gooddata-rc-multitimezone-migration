@@ -58,7 +58,7 @@ Rychly prehled python souboru (co delaji + kdy):
 - migrate.py                  = CLI vstup; všechny stepy
 
 - migration_tool/config.py    = načte rules + scope (oba CSV); STEP 1+2
-- migration_tool/discovery.py = sken workspace → scope CSV; STEP 1 (discover)
+- migration_tool/discovery.py = dependentEntitiesGraph + content scan → scope CSV; STEP 1 (discover)
 - migration_tool/transform.py = převod payloadů (metric/viz/dashboard); STEP 2 (plan)
 - migration_tool/api.py       = volání GoodData Entity API; STEP 1–4 + rollback
 - migration_tool/runner.py    = orchestrace + runs/; STEP 2–4 + rollback

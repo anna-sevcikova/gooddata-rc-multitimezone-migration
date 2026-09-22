@@ -12,7 +12,9 @@ from migration_tool.api import entity_content
 from migration_tool.config import ReplacementRule, ScopeRow, load_rules, load_scope
 from migration_tool.discovery import (
     aggregate_occurrences,
+    analytics_candidates_from_graph,
     discover_workspace_scope,
+    entry_point_identifiers,
     scan_dashboard_filter_context_occurrences,
     scan_metric_occurrences,
     scan_visualization_occurrences,
@@ -375,6 +377,37 @@ def cmd_self_test(_: argparse.Namespace) -> None:
         assert normalized[0].source_attribute == "old.hour"
         assert normalized[0].category == "visualization"
 
+    # Discover helpers: entry points + graph candidate extraction.
+    dep_rules = {
+        rd_half.source_attribute: rd_half,
+        rd_hour.source_attribute: rd_hour,
+    }
+    entry_points = entry_point_identifiers(dep_rules)
+    assert {"id": "old.half", "type": "attribute"} in entry_points
+    assert {"id": "old.half", "type": "label"} in entry_points
+    assert {"id": "old.hour.logical", "type": "attribute"} in entry_points
+    assert {"id": "old.hour.displayform", "type": "label"} in entry_points
+    assert len(entry_points) == 4
+
+    candidates = analytics_candidates_from_graph({
+        "graph": {
+            "nodes": [
+                {"id": "old.half", "type": "attribute", "title": "Half"},
+                {"id": "ds1", "type": "dataset", "title": "Dataset"},
+                {"id": "m1", "type": "metric", "title": "Metric"},
+                {"id": "v1", "type": "visualizationObject", "title": "Visual"},
+                {"id": "d1", "type": "analyticalDashboard", "title": "Dash"},
+                {"id": "m1", "type": "metric", "title": "Metric duplicate node"},
+            ],
+            "edges": [],
+        }
+    })
+    assert candidates == {
+        "metric": {"m1"},
+        "visualization": {"v1"},
+        "dashboard": {"d1"},
+    }
+
     print("SELF-TEST PASS")
     print("- metric MAQL")
     print("- visualization Case A")
@@ -384,6 +417,7 @@ def cmd_self_test(_: argparse.Namespace) -> None:
     print("- dashboard filterContext conversion + dashboard config cleanup")
     print("- scope discovery + unscoped-known-legacy diagnostics")
     print("- raw Platform export + normalized scope input compatibility")
+    print("- discover entry points + graph candidate extraction")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -416,7 +450,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_discover = sub.add_parser(
         "discover",
-        help="Read-only scan of the workspace and generate scope rows for all known legacy occurrences",
+        help=(
+            "Read-only: generate scope CSV via Cloud dependentEntitiesGraph "
+            "+ content scan of graph candidates"
+        ),
     )
     p_discover.add_argument(
         "--output",

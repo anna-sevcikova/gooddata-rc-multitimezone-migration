@@ -56,6 +56,9 @@ class GoodDataApi:
         base = f"{self.host}/api/v1/entities/workspaces/{self.workspace}/{collection}"
         return f"{base}/{object_id}" if object_id else base
 
+    def action_url(self, action: str) -> str:
+        return f"{self.host}/api/v1/actions/workspaces/{self.workspace}/{action}"
+
     def _request(
         self,
         method: str,
@@ -63,11 +66,15 @@ class GoodDataApi:
         *,
         params: dict[str, Any] | None = None,
         payload: dict[str, Any] | None = None,
+        content_type: str | None = None,
+        accept: str | None = None,
         expected: tuple[int, ...] = (200,),
     ) -> requests.Response:
         headers = dict(self.headers)
+        if accept is not None:
+            headers["Accept"] = accept
         if payload is not None:
-            headers["Content-Type"] = API_MEDIA
+            headers["Content-Type"] = content_type or API_MEDIA
         response = requests.request(
             method,
             url,
@@ -82,6 +89,28 @@ class GoodDataApi:
                 f"{method} {url} failed: HTTP {response.status_code}: {body}"
             )
         return response
+
+    def dependent_entities_graph(
+        self,
+        identifiers: list[dict[str, str]],
+        *,
+        relation: str = "DEPENDENTS",
+    ) -> dict[str, Any]:
+        """Cloud Action API equivalent of Platform used-by for entry-point IDs."""
+        if not identifiers:
+            raise ApiError("dependentEntitiesGraph requires at least one identifier")
+        # Action APIs speak application/json, not the Entity API media type.
+        response = self._request(
+            "POST",
+            self.action_url("dependentEntitiesGraph"),
+            payload={"identifiers": identifiers, "relation": relation},
+            content_type="application/json",
+            accept="application/json",
+        )
+        try:
+            return response.json()
+        except Exception as exc:
+            raise ApiError("dependentEntitiesGraph returned non-JSON content") from exc
 
     def get_entity(self, collection: str, object_id: str) -> dict[str, Any]:
         response = self._request("GET", self.entity_url(collection, object_id))
