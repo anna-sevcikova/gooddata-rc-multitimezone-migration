@@ -54,6 +54,13 @@ CATEGORY_ORDER = {
     "dashboard": 2,
 }
 
+# Dependent-entities graph node types that can become migration scope rows.
+GRAPH_TYPE_TO_CATEGORY = {
+    "metric": "metric",
+    "visualizationObject": "visualization",
+    "analyticalDashboard": "dashboard",
+}
+
 
 def _rule_by_source_label(rules: dict[str, ReplacementRule]) -> dict[str, ReplacementRule]:
     out: dict[str, ReplacementRule] = {}
@@ -236,84 +243,101 @@ def write_discovered_scope(path: Path, rows: list[DiscoveredScopeRow]) -> None:
             })
 
 
-def discover_workspace_scope(
+def entry_point_identifiers(rules: dict[str, ReplacementRule]) -> list[dict[str, str]]:
+    """Build dependentEntitiesGraph entry points from replacement rules.
+
+    Each rule contributes its logical attribute and its display-form/label ID
+    (they are often identical). Dedupes exact id+type pairs.
+    """
+    seen: set[tuple[str, str]] = set()
+    out: list[dict[str, str]] = []
+    for rule in rules.values():
+        for entity_type, entity_id in (
+            ("attribute", rule.source_attribute),
+            ("label", rule.source_label_id),
+        ):
+            key = (entity_type, entity_id)
+            if not entity_id or key in seen:
+                continue
+            seen.add(key)
+            out.append({"id": entity_id, "type": entity_type})
+    out.sort(key=lambda item: (item["type"], item["id"]))
+    return out
+
+
+def analytics_candidates_from_graph(payload: dict[str, Any]) -> dict[str, set[str]]:
+    """Extract metric/visualization/dashboard IDs from a dependentEntitiesGraph response.
+
+    Returns ``{category: {object_id, ...}}``. Intermediate catalog nodes (datasets,
+    labels, facts, …) are ignored. Callers must still content-scan candidates —
+    the graph is transitive and may include objects that only depend on a source
+    indirectly (e.g. dashboard → visualization → metric → attribute).
+    """
+    graph = payload.get("graph")
+    if not isinstance(graph, dict):
+        raise DiscoveryError("dependentEntitiesGraph response has no graph object")
+    nodes = graph.get("nodes")
+    if not isinstance(nodes, list):
+        raise DiscoveryError("dependentEntitiesGraph response.graph.nodes is not a list")
+
+    out: dict[str, set[str]] = {
+        "metric": set(),
+        "visualization": set(),
+        "dashboard": set(),
+    }
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_type = str(node.get("type") or "")
+        category = GRAPH_TYPE_TO_CATEGORY.get(node_type)
+        if not category:
+            continue
+        object_id = str(node.get("id") or "")
+        if object_id:
+            out[category].add(object_id)
+    return out
+
+
+def _scan_object_occurrences(
     *,
     api: GoodDataApi,
+    category: str,
+    object_id: str,
+    list_title: str,
     rules: dict[str, ReplacementRule],
+    context_cache: dict[str, dict[str, Any] | None],
+    warnings: list[str],
+) -> tuple[dict[str, Any] | None, list[Occurrence]]:
+    collection = COLLECTION_BY_CATEGORY[category]
+    entity = api.get_entity(collection, object_id)
+    if category == "metric":
+        return entity, scan_metric_occurrences(entity, rules)
+    if category == "visualization":
+        return entity, scan_visualization_occurrences(entity, rules)
+
+    try:
+        context_id = dashboard_filter_context_id(entity)
+    except TransformError as exc:
+        warnings.append(f"dashboard {list_title!r} ({object_id}): {exc}")
+        return None, []
+    if context_id not in context_cache:
+        context_cache[context_id] = api.try_get_entity("filterContexts", context_id)
+    context = context_cache[context_id]
+    if context is None:
+        warnings.append(
+            f"dashboard {entity_title(entity)!r} ({object_id}): "
+            f"filterContext {context_id!r} not found"
+        )
+        return None, []
+    return entity, scan_dashboard_filter_context_occurrences(context, rules)
+
+
+def _finalize_discovered_scope(
+    *,
+    rows: list[DiscoveredScopeRow],
+    warnings: list[str],
     output_path: Path,
 ) -> tuple[list[DiscoveredScopeRow], list[str]]:
-    """Read-only discovery of all known legacy occurrences in supported object types."""
-    rows: list[DiscoveredScopeRow] = []
-    warnings: list[str] = []
-    context_cache: dict[str, dict[str, Any] | None] = {}
-
-    print("DISCOVER — READ-ONLY WORKSPACE SCAN (NO WRITES)")
-    print(f"Host:      {api.host}")
-    print(f"Workspace: {api.workspace}")
-    print(f"Rules:     {len(rules)} known legacy source(s)")
-    print()
-
-    for category in ("metric", "visualization", "dashboard"):
-        collection = COLLECTION_BY_CATEGORY[category]
-        listed = api.list_entities(collection)
-        title_counts = _title_counts(listed)
-        print(f"Scanning {collection}: {len(listed)} effective object(s)")
-
-        for index, data in enumerate(listed, start=1):
-            object_id = str(data.get("id") or "")
-            attrs = data.get("attributes")
-            list_title = str(attrs.get("title") or "") if isinstance(attrs, dict) else ""
-            if not object_id:
-                warnings.append(f"{category}: list item without ID was skipped")
-                continue
-
-            try:
-                entity = api.get_entity(collection, object_id)
-                if category == "metric":
-                    occurrences = scan_metric_occurrences(entity, rules)
-                elif category == "visualization":
-                    occurrences = scan_visualization_occurrences(entity, rules)
-                else:
-                    try:
-                        context_id = dashboard_filter_context_id(entity)
-                    except TransformError as exc:
-                        warnings.append(f"dashboard {list_title!r} ({object_id}): {exc}")
-                        continue
-                    if context_id not in context_cache:
-                        context_cache[context_id] = api.try_get_entity("filterContexts", context_id)
-                    context = context_cache[context_id]
-                    if context is None:
-                        warnings.append(
-                            f"dashboard {entity_title(entity)!r} ({object_id}): "
-                            f"filterContext {context_id!r} not found"
-                        )
-                        continue
-                    occurrences = scan_dashboard_filter_context_occurrences(context, rules)
-
-                if not occurrences:
-                    continue
-
-                title = entity_title(entity)
-                if title_counts.get(title, 0) > 1:
-                    sources = ", ".join(sorted(aggregate_occurrences(occurrences)))
-                    warnings.append(
-                        f"{category} title {title!r} is ambiguous ({title_counts[title]} exact objects); "
-                        f"discovered source(s) {sources} were NOT emitted to scope"
-                    )
-                    continue
-
-                rows.extend(_rows_for_entity(
-                    workspace=api.workspace,
-                    category=category,
-                    entity=entity,
-                    occurrences=occurrences,
-                ))
-            except Exception as exc:
-                warnings.append(f"{category} {list_title!r} ({object_id}): scan failed: {exc}")
-
-        print(f"  done")
-
-    # Exact deterministic order; one row per object + logical legacy source.
     rows.sort(key=lambda r: (
         CATEGORY_ORDER.get(r.category, 99),
         r.object_title.casefold(),
@@ -322,7 +346,6 @@ def discover_workspace_scope(
         r.legacy_object_id,
     ))
 
-    # A generated scope must be loadable by the strict whitelist parser.
     keys: set[tuple[str, str, str]] = set()
     for row in rows:
         key = (row.category, row.object_title, row.source_attribute)
@@ -347,3 +370,94 @@ def discover_workspace_scope(
         print(f"Warnings file:        {warning_path}")
     print("No GoodData write was executed.")
     return rows, warnings
+
+
+def discover_workspace_scope(
+    *,
+    api: GoodDataApi,
+    rules: dict[str, ReplacementRule],
+    output_path: Path,
+) -> tuple[list[DiscoveredScopeRow], list[str]]:
+    """Read-only discovery via Cloud dependentEntitiesGraph, then content scan.
+
+    Entry points come from ``replacement-rules.csv`` (attribute + label IDs).
+    Only graph candidates in metric / visualization / dashboard are GET-scanned
+    with the same occurrence detectors used by plan. Transitive graph hits that
+    do not contain a direct content occurrence are dropped.
+    """
+    rows: list[DiscoveredScopeRow] = []
+    warnings: list[str] = []
+    context_cache: dict[str, dict[str, Any] | None] = {}
+
+    identifiers = entry_point_identifiers(rules)
+    print("DISCOVER — READ-ONLY (dependentEntitiesGraph + content scan)")
+    print(f"Host:         {api.host}")
+    print(f"Workspace:    {api.workspace}")
+    print(f"Rules:        {len(rules)} known legacy source(s)")
+    print(f"Entry points: {len(identifiers)} attribute/label identifier(s)")
+    print()
+
+    print("Querying dependentEntitiesGraph…")
+    graph_payload = api.dependent_entities_graph(identifiers)
+    candidates = analytics_candidates_from_graph(graph_payload)
+    total_candidates = sum(len(ids) for ids in candidates.values())
+    print(
+        "Graph candidates: "
+        f"metrics={len(candidates['metric'])}, "
+        f"visualizations={len(candidates['visualization'])}, "
+        f"dashboards={len(candidates['dashboard'])} "
+        f"(total {total_candidates})"
+    )
+    print()
+
+    for category in ("metric", "visualization", "dashboard"):
+        object_ids = sorted(candidates[category])
+        if not object_ids:
+            print(f"Scanning {COLLECTION_BY_CATEGORY[category]}: 0 graph candidate(s) — skip")
+            continue
+
+        # Title uniqueness still needs the full workspace list for this category
+        # (plan looks up by exact title across the workspace).
+        listed = api.list_entities(COLLECTION_BY_CATEGORY[category])
+        title_counts = _title_counts(listed)
+        print(
+            f"Scanning {COLLECTION_BY_CATEGORY[category]}: "
+            f"{len(object_ids)} graph candidate(s) "
+            f"(workspace has {len(listed)} object(s))"
+        )
+
+        for object_id in object_ids:
+            try:
+                entity, occurrences = _scan_object_occurrences(
+                    api=api,
+                    category=category,
+                    object_id=object_id,
+                    list_title=object_id,
+                    rules=rules,
+                    context_cache=context_cache,
+                    warnings=warnings,
+                )
+                if entity is None or not occurrences:
+                    continue
+
+                title = entity_title(entity)
+                if title_counts.get(title, 0) > 1:
+                    sources = ", ".join(sorted(aggregate_occurrences(occurrences)))
+                    warnings.append(
+                        f"{category} title {title!r} is ambiguous ({title_counts[title]} exact objects); "
+                        f"discovered source(s) {sources} were NOT emitted to scope"
+                    )
+                    continue
+
+                rows.extend(_rows_for_entity(
+                    workspace=api.workspace,
+                    category=category,
+                    entity=entity,
+                    occurrences=occurrences,
+                ))
+            except Exception as exc:
+                warnings.append(f"{category} ({object_id}): scan failed: {exc}")
+
+        print("  done")
+
+    return _finalize_discovered_scope(rows=rows, warnings=warnings, output_path=output_path)

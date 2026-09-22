@@ -16,8 +16,9 @@ export GD_TOKEN
 #pustit a vlozit token, pro restore -> unset GD_TOKEN
 #kontrola např. echo "$GD_HOST"
 
---------------------- predtim nez jdeme vytvaret plan si muzeme zkontrolovat, jestli mame scope spravne (ale bacha trva to)
+--------------------- predtim nez jdeme vytvaret plan si nechame vygenerovat scope pro dany workspace
 --- generuje komplet novy scope (jde tedy pak vyuzit bez uprav jako input)
+--- pouziva Cloud dependentEntitiesGraph + content scan kandidatu (rychle)
 python3 migrate.py discover \
   --output input/discovered-scope-EV_Master_ASE2.csv
 

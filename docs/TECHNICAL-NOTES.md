@@ -41,7 +41,12 @@ The existing normalized/headered scope remains supported, so V1.4-generated disc
 
 ## Discovery contract
 
-`discover` is read-only. It scans only sources that exist in `replacement-rules.csv`; it does not attempt heuristic detection of unknown legacy time attributes.
+`discover` is read-only. It builds Cloud `dependentEntitiesGraph` entry points from
+every `source_attribute` / `source_label` in `replacement-rules.csv`
+(`relation=DEPENDENTS`), then content-scans only the resulting metric /
+visualization / dashboard candidates. It does not attempt heuristic detection of
+unknown legacy time attributes. Transitive graph hits without a direct content
+occurrence are dropped by the scanners.
 
 A logical source is identified using the rule's exact API identity:
 

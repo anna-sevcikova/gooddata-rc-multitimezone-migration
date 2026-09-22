@@ -100,7 +100,9 @@ No API calls/writes. V1.4.1 self-test covers the existing migration cases plus d
 python3 migrate.py discover
 ```
 
-This performs **GET/list calls only** and scans all supported effective objects in `GD_WORKSPACE` against the shared replacement rules.
+This performs **GET/list calls only**. It queries Cloud `dependentEntitiesGraph`
+for every attribute/label in `replacement-rules.csv`, then content-scans only those
+candidate metrics / visualizations / dashboards in `GD_WORKSPACE`.
 
 Default output:
 
