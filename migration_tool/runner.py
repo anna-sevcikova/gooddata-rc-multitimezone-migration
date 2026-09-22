@@ -396,10 +396,13 @@ def plan(
             entity = api.get_entity(collection, object_id)
             if entity_id(entity) != object_id:
                 raise RunnerError("Entity identity mismatch after lookup")
-            if entity_title(entity) != title:
+            # Scope titles are normalized with strip(); live titles may keep
+            # accidental leading/trailing spaces (seen in customer clones).
+            live_title = entity_title(entity)
+            if live_title.strip() != title.strip():
                 raise RunnerError(
                     f"Entity title mismatch after lookup: scope title {title!r} "
-                    f"!= live title {entity_title(entity)!r} for id {object_id}"
+                    f"!= live title {live_title!r} for id {object_id}"
                 )
             if entity_type(entity) != TYPE_BY_CATEGORY[category]:
                 raise RunnerError(
