@@ -512,6 +512,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         help="Generated scope CSV; default: input/discovered-scope-<GD_WORKSPACE>.csv",
     )
+    p_discover.add_argument(
+        "--native-only",
+        action="store_true",
+        help=(
+            "Scan only objects owned by GD_WORKSPACE (origin=NATIVE); skip inherited "
+            "objects. Use on child workspaces — inherited content is migrated in the parent."
+        ),
+    )
 
     p_apply = sub.add_parser("apply", help="Apply a successful plan using individual Entity API PUTs")
     p_apply.add_argument("--confirm-host", required=True)
@@ -546,6 +554,7 @@ def main() -> None:
                 api=GoodDataApi(host, workspace, token),
                 rules=rules,
                 output_path=output,
+                native_only=args.native_only,
             )
             # Prove the generated file is directly consumable by the existing strict scope parser.
             load_scope(output, rules)
