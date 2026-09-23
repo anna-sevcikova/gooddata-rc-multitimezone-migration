@@ -139,14 +139,21 @@ class GoodDataApi:
         except Exception as exc:
             raise ApiError(f"GET {url} returned non-JSON content") from exc
 
-    def list_entities(self, collection: str, page_size: int = 200) -> list[dict[str, Any]]:
+    def list_entities(
+        self, collection: str, page_size: int = 200, *, origin: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List a collection. ``origin="NATIVE"`` returns only objects owned by this
+        workspace (skips objects inherited from a parent, which a child cannot edit)."""
         out: list[dict[str, Any]] = []
         page = 0
         while True:
+            params: dict[str, Any] = {"page": page, "size": page_size}
+            if origin:
+                params["origin"] = origin
             response = self._request(
                 "GET",
                 self.entity_url(collection),
-                params={"page": page, "size": page_size},
+                params=params,
             )
             try:
                 payload = response.json()
