@@ -377,8 +377,13 @@ def discover_workspace_scope(
     api: GoodDataApi,
     rules: dict[str, ReplacementRule],
     output_path: Path,
+    native_only: bool = False,
 ) -> tuple[list[DiscoveredScopeRow], list[str]]:
     """Read-only discovery via Cloud dependentEntitiesGraph, then content scan.
+
+    ``native_only`` restricts listing and scanning to objects owned by the
+    workspace (``origin=NATIVE``). Use it on child workspaces: inherited objects
+    are hierarchy-locked there and must be migrated in the parent instead.
 
     Entry points come from ``replacement-rules.csv`` (attribute + label IDs).
     Only graph candidates in metric / visualization / dashboard are GET-scanned
@@ -393,6 +398,7 @@ def discover_workspace_scope(
     print("DISCOVER — READ-ONLY (dependentEntitiesGraph + content scan)")
     print(f"Host:         {api.host}")
     print(f"Workspace:    {api.workspace}")
+    print(f"Objects:      {'NATIVE only (inherited skipped)' if native_only else 'ALL (native + inherited)'}")
     print(f"Rules:        {len(rules)} known legacy source(s)")
     print(f"Entry points: {len(identifiers)} attribute/label identifier(s)")
     print()
@@ -418,12 +424,22 @@ def discover_workspace_scope(
 
         # Title uniqueness still needs the full workspace list for this category
         # (plan looks up by exact title across the workspace).
-        listed = api.list_entities(COLLECTION_BY_CATEGORY[category])
+        listed = api.list_entities(
+            COLLECTION_BY_CATEGORY[category], origin="NATIVE" if native_only else None
+        )
         title_counts = _title_counts(listed)
+        if native_only:
+            native_ids = {str(x.get("id") or "") for x in listed}
+            skipped = len(object_ids)
+            object_ids = [i for i in object_ids if i in native_ids]
+            skipped -= len(object_ids)
+        else:
+            skipped = 0
         print(
             f"Scanning {COLLECTION_BY_CATEGORY[category]}: "
             f"{len(object_ids)} graph candidate(s) "
-            f"(workspace has {len(listed)} object(s))"
+            f"(workspace has {len(listed)} object(s)"
+            + (f", {skipped} inherited candidate(s) skipped)" if native_only else ")")
         )
 
         for object_id in object_ids:
