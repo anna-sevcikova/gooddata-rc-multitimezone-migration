@@ -1,4 +1,16 @@
-# Technical Notes — v1.4.1
+# Technical Notes — v1.4.2
+
+## What changed in v1.4.2
+
+Safety-stop automations for common blocked shapes found in production tooling-2 runs:
+
+- visualization filter: if the target date dataset already has a date filter, **drop** the legacy attribute filter (+ `attributeFilterConfigs`) instead of blocking
+- visualization filter: on convert, also **remove** matching `attributeFilterConfigs`
+- Case B: allow N copies of the **same** source field — reuse DAY once, delete all copies
+- Case B collision (multiple different sources on one DAY, or multiple DAY fields) → **Case C** fallback (keep day, replace sources in place)
+- shared dashboard `filterContext`: migrate once for all consumer dashboards; clean `attributeFilterConfigs` on each sibling
+
+Title whitespace strip on ID-lookup verification was already shipped in v1.4.1 / PR #4.
 
 ## What changed in v1.4.1
 
@@ -145,22 +157,39 @@ More than one target DAY -> BLOCKED.
 
 ### Visualization legacy filter
 
-Converted to unrestricted target date filter. Existing date filters are immutable. API form omits `from`/`to`.
+Converted to unrestricted target date filter. Existing date filters are immutable.
+If the target date dataset already has a date filter, the legacy attribute filter is
+**dropped** (not converted) together with matching `attributeFilterConfigs`.
+Otherwise convert and strip matching `attributeFilterConfigs`.
+API form for converted visualization filters omits `from`/`to`.
 
 ### Dashboard legacy filter
 
-Scope boundary is the analytical dashboard. Technical storage is resolved through `filterContextRef`. Conversion can produce two writes:
+Scope boundary is the analytical dashboard. Technical storage is resolved through `filterContextRef`. Conversion can produce writes:
 
 ```text
-analyticalDashboard   -> remove obsolete matching attributeFilterConfigs
-filterContext         -> attributeFilter -> unrestricted dateFilter
+analyticalDashboard(s)  -> remove obsolete matching attributeFilterConfigs
+                           (primary + every sibling sharing the filterContext)
+filterContext           -> attributeFilter -> unrestricted dateFilter
+                           (or drop attributeFilter when target date already exists)
 ```
 
-The source filter local identifier is preserved. Existing date filters remain unchanged.
+Shared filterContexts (referenced by multiple dashboards) are migrated once; the
+filterContext write applies to all consumers. Existing date filters remain unchanged
+when kept; duplicate target-date filters are never added.
 
 ### Metrics
 
 Only exact MAQL tokens are replaced; no broad text substitution.
+
+### Case B / Case C coexistence
+
+Case B (reuse DAY, remove source) only when there is exactly one target DAY field and
+exactly one scoped source that wants to reuse it. That source may appear multiple times
+as fields — all copies are removed after reuse.
+
+Otherwise (multiple DAY fields, or multiple different scoped sources claiming the same
+DAY) → Case C: leave DAY untouched, replace each source in place with its default label.
 
 ## Safety model retained
 
@@ -205,6 +234,17 @@ Added:
 - warning file for discovery cases that cannot be safely emitted,
 - non-blocking `UNSCOPED KNOWN LEGACY` warning during `plan`,
 - synthetic tests for discovery and source-label differences.
+
+### v1.4.2
+
+Added:
+
+- visualization filter drop when target date dataset already filtered,
+- visualization `attributeFilterConfigs` cleanup on filter convert/drop,
+- Case B many-copy collapse for the same source field,
+- Case C fallback for multi-source / multi-DAY Case B collisions,
+- shared dashboard filterContext migration (one FC write + sibling config cleanup),
+- self-tests covering the above.
 
 ### v1.4.1
 

@@ -26,7 +26,7 @@ python3 migrate.py discover \
 
 --- spusteni plánu
 python3 migrate.py \
-  --scope input/pilot-scope.csv \
+  --scope input/discovered-scope-EV_biz-eo-p01_20560000.csv \
   plan
 
 vytvori:
@@ -55,7 +55,12 @@ echo "$GD_WORKSPACE"
 
 --- vse ok, spusteni apply
 python3 migrate.py \
-  --run runs/EV_Master_Final-20260922-125404+0200 \ -- selected plan
+  --run runs/EV_Master_Final-20260922-125404+0200 \
+  apply \
+  --confirm-host "$GD_HOST" \
+  --confirm-workspace "$GD_WORKSPACE"
+
+python3 migrate.py \
   apply \
   --confirm-host "$GD_HOST" \
   --confirm-workspace "$GD_WORKSPACE"

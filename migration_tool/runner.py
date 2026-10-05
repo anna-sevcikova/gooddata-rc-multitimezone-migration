@@ -39,7 +39,7 @@ from .transform import (
 )
 
 
-TOOL_VERSION = "1.4.1"
+TOOL_VERSION = "1.4.2"
 
 
 class RunnerError(RuntimeError):
@@ -297,15 +297,20 @@ def plan(
         print(f"  {len(listed_by_category[category])} effective object(s)")
 
     dashboard_usage: dict[str, list[str]] = {}
+    dashboards_by_id: dict[str, dict[str, Any]] = {}
     if "dashboard" in needed_categories:
         print("Resolving dashboard filter-context ownership ...")
         dashboards_full = _full_dashboard_entities(api, listed_by_category["dashboard"])
+        dashboards_by_id = {entity_id(d): d for d in dashboards_full}
         dashboard_usage = _dashboard_context_usage(dashboards_full)
         print(f"  {len(dashboard_usage)} filter context reference(s) discovered")
 
     plan_objects: list[dict[str, Any]] = []
     writes: list[dict[str, Any]] = []
     used_write_keys: set[tuple[str, str]] = set()
+    # Shared filterContexts are migrated once; later scoped dashboards that share
+    # the same context are reported as already handled.
+    handled_filter_contexts: dict[str, dict[str, Any]] = {}
 
     row_counts = {
         "READY": 0,
@@ -421,19 +426,72 @@ def plan(
                 context_id = dashboard_filter_context_id(entity)
                 obj_report["filter_context_id"] = context_id
                 users = dashboard_usage.get(context_id, [])
-                if len(users) != 1 or users[0] != object_id:
+                if object_id not in users:
                     raise TransformError(
-                        f"Dashboard filter context {context_id!r} is shared/referenced by {len(users)} dashboards: {users}"
+                        f"Dashboard filter context {context_id!r} is not referenced by "
+                        f"scoped dashboard {object_id!r} (known users: {users})"
                     )
+
+                # Shared filterContexts are migrated once for all consumer dashboards.
+                prior = handled_filter_contexts.get(context_id)
+                if prior is not None:
+                    obj_report["object_status"] = "READY" if prior.get("changed") else "NO_CHANGE"
+                    obj_report["shared_filter_context"] = {
+                        "handled_via_dashboard": prior.get("primary_dashboard_id"),
+                        "consumer_dashboards": users,
+                    }
+                    for row in rows:
+                        detail = (
+                            f"Shared filter context {context_id!r} already planned via "
+                            f"dashboard {prior.get('primary_dashboard_id')}"
+                        )
+                        status = "READY" if prior.get("changed") else "NO_OCCURRENCE"
+                        obj_report["row_outcomes"].append({
+                            "row_number": row.row_number,
+                            "legacy_object_id": row.legacy_object_id,
+                            "source_attribute": row.source_attribute,
+                            "status": status,
+                            "detail": detail,
+                        })
+                        row_counts[status] = row_counts.get(status, 0) + 1
+                    print(
+                        f"  SHARED FILTER CONTEXT already handled via "
+                        f"{prior.get('primary_dashboard_id')} ({len(users)} dashboard(s))"
+                    )
+                    plan_objects.append(obj_report)
+                    continue
+
                 context_entity = api.try_get_entity("filterContexts", context_id)
                 if context_entity is None:
                     raise TransformError(
                         f"Dashboard filter context {context_id!r} was not found at Entity API collection 'filterContexts'. "
                         "This dashboard payload shape must be tested before enabling writes."
                     )
-                result = transform_dashboard_filter_context(entity, context_entity, rows, rules)
+                siblings = [
+                    dashboards_by_id[sid]
+                    for sid in users
+                    if sid != object_id and sid in dashboards_by_id
+                ]
+                if len(users) > 1:
+                    print(
+                        f"  SHARED FILTER CONTEXT {context_id!r} used by {len(users)} dashboards; "
+                        "migrating once for all consumers"
+                    )
+                result = transform_dashboard_filter_context(
+                    entity,
+                    context_entity,
+                    rows,
+                    rules,
+                    sibling_dashboards=siblings,
+                )
                 write_collection = "filterContexts"
                 write_backup = context_entity
+                # Register only after the object finishes successfully (see below).
+                obj_report["_pending_shared_context"] = {
+                    "context_id": context_id,
+                    "primary_dashboard_id": object_id,
+                    "consumer_dashboards": list(users),
+                }
 
             # V1.4 diagnostic only: scan the already-loaded live object against every known
             # replacement rule and report known legacy sources that are present but NOT
@@ -495,9 +553,20 @@ def plan(
             if result.blocked:
                 obj_report["object_status"] = "BLOCKED"
                 obj_report["block_reason"] = result.block_reason
+                obj_report.pop("_pending_shared_context", None)
                 print(f"  BLOCKED: {result.block_reason}")
             elif result.changed:
                 obj_report["object_status"] = "READY"
+                pending_shared = obj_report.pop("_pending_shared_context", None)
+                if pending_shared:
+                    handled_filter_contexts[str(pending_shared["context_id"])] = {
+                        "primary_dashboard_id": pending_shared["primary_dashboard_id"],
+                        "consumer_dashboards": pending_shared["consumer_dashboards"],
+                        "changed": True,
+                    }
+                    obj_report["shared_filter_context"] = {
+                        "consumer_dashboards": pending_shared["consumer_dashboards"],
+                    }
                 if result.planned_writes:
                     for planned in result.planned_writes:
                         write = _write_entry(
@@ -545,11 +614,22 @@ def plan(
                     raise RunnerError("Transform reported changed=True but produced no planned write")
             else:
                 obj_report["object_status"] = "NO_CHANGE"
+                pending_shared = obj_report.pop("_pending_shared_context", None)
+                if pending_shared:
+                    handled_filter_contexts[str(pending_shared["context_id"])] = {
+                        "primary_dashboard_id": pending_shared["primary_dashboard_id"],
+                        "consumer_dashboards": pending_shared["consumer_dashboards"],
+                        "changed": False,
+                    }
+                    obj_report["shared_filter_context"] = {
+                        "consumer_dashboards": pending_shared["consumer_dashboards"],
+                    }
                 print("  NO CHANGE")
 
         except (ApiError, TransformError, RunnerError, ConfigError) as exc:
             obj_report["object_status"] = "BLOCKED"
             obj_report["block_reason"] = str(exc)
+            obj_report.pop("_pending_shared_context", None)
             obj_report["row_outcomes"] = []
             for row in rows:
                 obj_report["row_outcomes"].append({
