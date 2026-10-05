@@ -4,7 +4,7 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-from .api import entity_content, put_payload_from_entity
+from .api import entity_content, entity_id, put_payload_from_entity
 from .config import ReplacementRule, ScopeRow
 
 
@@ -252,6 +252,34 @@ def transform_metric(
     return TransformResult(changed, proposed if changed else None, outcomes, checks)
 
 
+def _remove_attribute_filter_configs(content: dict[str, Any], local_ids: set[str]) -> int:
+    """Drop visualization/dashboard attributeFilterConfigs for converted/removed filters."""
+    return _remove_dashboard_attribute_filter_configs(content, local_ids)
+
+
+def _drop_source_attribute_filter(
+    content: dict[str, Any],
+    index: int,
+    local_id: str | None,
+    *,
+    dependent_container: dict[str, Any] | None = None,
+) -> int:
+    """Remove one attribute filter and its configs; block on unknown leftover refs."""
+    del content["filters"][index]
+    removed_configs = 0
+    if local_id:
+        removed_configs = _remove_attribute_filter_configs(content, {local_id})
+        if dependent_container is not None and json_contains_token(dependent_container, local_id):
+            raise TransformError(
+                f"source filter {local_id} is still referenced by dashboard content/config after drop"
+            )
+        if json_contains_token(content, local_id):
+            raise TransformError(
+                f"source filter {local_id} is still referenced outside attributeFilterConfigs after drop"
+            )
+    return removed_configs
+
+
 def _convert_source_filter(
     content: dict[str, Any],
     row: ScopeRow,
@@ -277,26 +305,53 @@ def _convert_source_filter(
             f"{row.source_attribute}: found {len(matching)} source attribute filters; expected exactly one"
         )
 
-    # Avoid duplicate/same-dataset date-filter semantics that we have not tested.
-    if existing_same_dataset_dates:
-        raise TransformError(
-            f"{row.source_attribute}: target date dataset {rule.target_date_dimension} already has "
-            "a date filter in this object; existing date filters are immutable and duplicate semantics are unsafe"
-        )
-
     index, _, local_id = matching[0]
 
-    configs = content.get("attributeFilterConfigs") or {}
-    if local_id and isinstance(configs, dict) and local_id in configs:
-        raise TransformError(
-            f"{row.source_attribute}: source filter {local_id} has attributeFilterConfigs"
+    # Same target date dataset already filtered: drop the legacy attribute filter
+    # (and its configs) instead of creating a duplicate date filter.
+    if existing_same_dataset_dates:
+        removed_configs = _drop_source_attribute_filter(
+            content,
+            index,
+            local_id,
+            dependent_container=dependent_container,
         )
+        detail = (
+            f"Drop source attribute filter; target date dataset {rule.target_date_dimension} "
+            "already has a date filter"
+        )
+        if removed_configs:
+            detail += f"; removed {removed_configs} attributeFilterConfigs"
+        return True, detail, {
+            "kind": "removed_source_attribute_filter",
+            "source_attribute": row.source_attribute,
+            "source_label_id": rule.source_label_id,
+            "target_date_dimension": rule.target_date_dimension,
+            "local_identifier": local_id,
+        }
+
+    # Convert to unrestricted date filter and drop obsolete attribute-filter configs.
+    removed_configs = 0
+    if local_id:
+        removed_configs = _remove_attribute_filter_configs(content, {local_id})
+
+    content["filters"][index] = make_unrestricted_date_filter(rule.target_date_dimension)
+
     if local_id and dependent_container is not None and json_contains_token(dependent_container, local_id):
         raise TransformError(
             f"{row.source_attribute}: source dashboard filter {local_id} is referenced by dashboard content/config"
         )
+    if local_id and json_contains_token(content, local_id):
+        raise TransformError(
+            f"{row.source_attribute}: converted filter {local_id} is still referenced "
+            "outside supported attributeFilterConfigs"
+        )
 
-    content["filters"][index] = make_unrestricted_date_filter(rule.target_date_dimension)
+    detail = (
+        f"Convert attribute filter to unrestricted date filter on {rule.target_date_dimension}"
+    )
+    if removed_configs:
+        detail += f"; removed {removed_configs} attributeFilterConfigs"
     check = {
         "kind": "unrestricted_date_filter",
         "source_attribute": row.source_attribute,
@@ -304,16 +359,20 @@ def _convert_source_filter(
         "target_date_dimension": rule.target_date_dimension,
         "api_granularity": "GDC.time.year",
     }
-    return True, (
-        f"Convert attribute filter to unrestricted date filter on {rule.target_date_dimension}"
-    ), check
+    return True, detail, check
 
 
-def _preflight_reuse_claims(
+def _sources_forced_to_case_c(
     original_content: dict[str, Any],
     rows: list[ScopeRow],
     rules: dict[str, ReplacementRule],
-) -> None:
+) -> set[str]:
+    """Sources that would collide on Case B DAY reuse -> fall back to Case C.
+
+    Case B stays only when there is exactly one target DAY field and exactly one
+    scoped source that wants to reuse it (that source may appear N times as fields).
+    """
+    force: set[str] = set()
     claims: dict[tuple[str, str], list[str]] = {}
     for row in rows:
         rule = rules[row.source_attribute]
@@ -324,17 +383,26 @@ def _preflight_reuse_claims(
             continue
         day_fields = items_by_label(original_content, f"{rule.target_date_dimension}.day")
         if len(day_fields) > 1:
-            raise TransformError(
-                f"{row.source_attribute}: more than one existing {rule.target_date_dimension}.day field"
-            )
+            force.add(row.source_attribute)
+            continue
         if len(day_fields) == 1:
             local_id = str(day_fields[0][4].get("localIdentifier") or "")
             key = (rule.target_date_dimension, local_id)
             claims.setdefault(key, []).append(row.source_attribute)
-    collisions = {k: v for k, v in claims.items() if len(v) > 1}
-    if collisions:
-        detail = "; ".join(f"{k}: {v}" for k, v in collisions.items())
-        raise TransformError(f"Multiple scoped sources would reuse the same DAY field: {detail}")
+    for sources in claims.values():
+        if len(sources) > 1:
+            force.update(sources)
+    return force
+
+
+def _replace_source_fields_in_place(
+    source_fields: list[tuple[int, int, str, dict[str, Any], dict[str, Any]]],
+    target_label: str,
+    title: str,
+) -> None:
+    for _, _, _, _, attr in source_fields:
+        set_display_form_id(attr, target_label)
+        apply_alias(attr, title)
 
 
 def _transform_visual_field(
@@ -342,6 +410,8 @@ def _transform_visual_field(
     original_content: dict[str, Any],
     row: ScopeRow,
     rule: ReplacementRule,
+    *,
+    force_case_c: bool = False,
 ) -> tuple[bool, str, dict[str, Any] | None]:
     source_fields = items_by_label(content, rule.source_label_id)
     if not source_fields:
@@ -351,9 +421,7 @@ def _transform_visual_field(
     title = rule.visual_default_title
 
     if not rule.day_reuse_enabled:
-        for _, _, _, _, attr in source_fields:
-            set_display_form_id(attr, target_label)
-            apply_alias(attr, title)
+        _replace_source_fields_in_place(source_fields, target_label, title)
         return True, (
             f"Replace {len(source_fields)} field occurrence(s) with label/{target_label}"
         ), {
@@ -365,19 +433,10 @@ def _transform_visual_field(
         }
 
     original_days = items_by_label(original_content, f"{rule.target_date_dimension}.day")
-    if len(original_days) > 1:
-        raise TransformError(
-            f"{row.source_attribute}: more than one existing {rule.target_date_dimension}.day field"
-        )
 
-    if len(original_days) == 1:
-        # Case B. Multiple source fields collapsing into one DAY field is intentionally blocked
-        # until a real workspace demonstrates that this is desired.
-        if len(source_fields) != 1:
-            raise TransformError(
-                f"{row.source_attribute}: Case B has {len(source_fields)} source fields; "
-                "automatic many-to-one collapse is unsafe"
-            )
+    # Case B only with exactly one DAY and no cross-source collision.
+    # Multiple copies of the *same* source are OK: reuse DAY once, delete all copies.
+    if len(original_days) == 1 and not force_case_c:
         day_local_id = str(original_days[0][4].get("localIdentifier") or "")
         if not day_local_id:
             raise TransformError(f"{row.source_attribute}: reusable DAY field has no localIdentifier")
@@ -390,37 +449,33 @@ def _transform_visual_field(
         set_display_form_id(day_attr, rule.day_reuse_label_id)
         apply_alias(day_attr, rule.day_reuse_title or "")
 
-        source_attr = source_fields[0][4]
-        source_local_id = str(source_attr.get("localIdentifier") or "")
-        if not source_local_id:
-            raise TransformError(f"{row.source_attribute}: source field has no localIdentifier")
-        source_rows = items_by_local_id(content, source_local_id)
-        source_rows = [x for x in source_rows if display_form_id(x[4]) == rule.source_label_id]
-        if len(source_rows) != 1:
-            raise TransformError(
-                f"{row.source_attribute}: source localIdentifier {source_local_id!r} is not uniquely removable"
-            )
-        bi, ii, _, _, _ = source_rows[0]
-        remove_item(content, bi, ii)
-        # Case B collapses two fields into one localIdentifier. Sorts / columnWidths /
-        # properties often still point at the removed source id — remap those exact
-        # references onto the reused DAY field instead of blocking.
-        remapped = remap_exact_string_tokens(content, source_local_id, day_local_id)
-        if json_contains_token(content, source_local_id):
-            raise TransformError(
-                f"{row.source_attribute}: removed source field localIdentifier {source_local_id} "
-                "is still referenced elsewhere (sort/config/bucket dependency) after remap "
-                f"to {day_local_id}"
-            )
+        # Remove highest bucket/item indexes first so earlier indexes stay valid.
+        removable = sorted(source_fields, key=lambda x: (x[0], x[1]), reverse=True)
+        removed_local_ids: list[str] = []
+        remapped = 0
+        for bi, ii, _, _, source_attr in removable:
+            source_local_id = str(source_attr.get("localIdentifier") or "")
+            if not source_local_id:
+                raise TransformError(f"{row.source_attribute}: source field has no localIdentifier")
+            remove_item(content, bi, ii)
+            removed_local_ids.append(source_local_id)
+            # Case B collapses fields into one localIdentifier. Sorts / columnWidths /
+            # properties often still point at the removed source id — remap those exact
+            # references onto the reused DAY field instead of blocking.
+            remapped += remap_exact_string_tokens(content, source_local_id, day_local_id)
+            if json_contains_token(content, source_local_id):
+                raise TransformError(
+                    f"{row.source_attribute}: removed source field localIdentifier {source_local_id} "
+                    "is still referenced elsewhere (sort/config/bucket dependency) after remap "
+                    f"to {day_local_id}"
+                )
+
         detail = (
             f"Case B: reuse {rule.target_date_dimension}.day as label/{rule.day_reuse_label_id}; "
-            f"remove source field {source_local_id}"
+            f"remove {len(removed_local_ids)} source field(s) {removed_local_ids}"
         )
         if remapped:
-            detail += (
-                f"; remapped {remapped} leftover reference(s) "
-                f"{source_local_id} -> {day_local_id}"
-            )
+            detail += f"; remapped {remapped} leftover reference(s) onto {day_local_id}"
         return True, detail, {
             "kind": "visual_field",
             "source_attribute": row.source_attribute,
@@ -428,16 +483,17 @@ def _transform_visual_field(
             "target_label_id": rule.day_reuse_label_id,
             "target_local_ids": [day_local_id],
             "remapped_local_id_references": remapped,
+            "removed_source_local_ids": removed_local_ids,
         }
 
-    # Case A or Case C: source is replaced in place. Existing non-DAY target usages remain untouched.
-    for _, _, _, _, attr in source_fields:
-        set_display_form_id(attr, target_label)
-        apply_alias(attr, title)
-    existing_non_day = [
-        display_form_id(x[4]) for x in target_dimension_items(original_content, rule.target_date_dimension)
-    ]
-    case = "Case C" if existing_non_day else "Case A"
+    # Case A or Case C: source is replaced in place. Existing day / non-DAY target usages
+    # remain untouched (including when Case B is unsafe: multi-day or multi-source claim).
+    _replace_source_fields_in_place(source_fields, target_label, title)
+    existing_target = target_dimension_items(original_content, rule.target_date_dimension)
+    if force_case_c or existing_target:
+        case = "Case C"
+    else:
+        case = "Case A"
     return True, (
         f"{case}: replace {len(source_fields)} source field occurrence(s) with label/{target_label}"
     ), {
@@ -461,14 +517,18 @@ def transform_visualization(
     changed = False
 
     try:
-        _preflight_reuse_claims(original_content, rows, rules)
+        force_case_c = _sources_forced_to_case_c(original_content, rows, rules)
         for row in rows:
             rule = rules[row.source_attribute]
             row_changed = False
             details: list[str] = []
 
             field_changed, field_detail, field_check = _transform_visual_field(
-                content, original_content, row, rule
+                content,
+                original_content,
+                row,
+                rule,
+                force_case_c=row.source_attribute in force_case_c,
             )
             if field_changed:
                 row_changed = True
@@ -660,17 +720,26 @@ def _convert_dashboard_source_filter(
         raise TransformError(
             f"{row.source_attribute}: found {len(matching)} dashboard source attribute filters; expected exactly one"
         )
-    if existing_same_dataset_dates:
-        raise TransformError(
-            f"{row.source_attribute}: target date dataset {rule.target_date_dimension} already has "
-            "a dashboard date filter; existing date filters are immutable and duplicate semantics are unsafe"
-        )
 
     index, _, local_id = matching[0]
     if not local_id:
         raise TransformError(
             f"{row.source_attribute}: dashboard source attribute filter has no localIdentifier"
         )
+
+    # Same target date dataset already filtered: drop the legacy attribute filter.
+    if existing_same_dataset_dates:
+        del content["filters"][index]
+        return True, (
+            f"Drop dashboard attribute filter; target date dataset {rule.target_date_dimension} "
+            "already has a date filter"
+        ), {
+            "kind": "removed_dashboard_attribute_filter",
+            "source_attribute": row.source_attribute,
+            "source_label_id": rule.source_label_id,
+            "target_date_dimension": rule.target_date_dimension,
+            "local_identifier": local_id,
+        }, local_id
 
     content["filters"][index] = _make_unrestricted_dashboard_date_filter(
         rule.target_date_dimension,
@@ -694,15 +763,28 @@ def transform_dashboard_filter_context(
     filter_context_entity: dict[str, Any],
     rows: list[ScopeRow],
     rules: dict[str, ReplacementRule],
+    *,
+    sibling_dashboards: list[dict[str, Any]] | None = None,
 ) -> TransformResult:
+    """Migrate a dashboard filterContext; clean configs on this dashboard and any siblings.
+
+    Shared filterContexts (referenced by multiple dashboards) are intentionally allowed:
+    one filterContext write applies to all consumers; attributeFilterConfigs are cleaned
+    on every dashboard that references the context.
+    """
     proposed_context = put_payload_from_entity(filter_context_entity)
     context_content = entity_content(proposed_context)
-    proposed_dashboard = put_payload_from_entity(dashboard_entity)
-    dashboard_content = entity_content(proposed_dashboard)
     outcomes: list[RowOutcome] = []
     context_checks: list[dict[str, Any]] = []
     converted_local_ids: set[str] = set()
     changed = False
+
+    # Primary + siblings that share the filter context (dedupe by entity id).
+    dashboards_by_id: dict[str, dict[str, Any]] = {
+        entity_id(dashboard_entity): dashboard_entity,
+    }
+    for sibling in sibling_dashboards or []:
+        dashboards_by_id[entity_id(sibling)] = sibling
 
     try:
         for row in rows:
@@ -724,37 +806,39 @@ def transform_dashboard_filter_context(
                     _row_outcome(row, "NO_OCCURRENCE", "No source attribute filter in dashboard filter context")
                 )
 
-        dashboard_changed = False
-        dashboard_checks: list[dict[str, Any]] = []
-        if converted_local_ids:
-            removed = _remove_dashboard_attribute_filter_configs(
-                dashboard_content,
-                converted_local_ids,
-            )
-            # After removing the known attribute-filter config containers, any remaining reference
-            # to a converted filter localIdentifier is an unknown dependency and must block the write.
-            for local_id in sorted(converted_local_ids):
-                if json_contains_token(dashboard_content, local_id):
-                    raise TransformError(
-                        f"Converted dashboard filter {local_id} is still referenced outside supported attributeFilterConfigs"
-                    )
-            if removed:
-                dashboard_changed = True
-                dashboard_checks.append({
-                    "kind": "dashboard_attribute_filter_configs_removed",
-                    "local_identifiers": sorted(converted_local_ids),
-                })
-
         planned_writes: list[dict[str, Any]] = []
-        # Write dashboard config cleanup first. If the following filterContext PUT fails,
-        # automatic rollback restores this dashboard before the run exits.
-        if dashboard_changed:
-            planned_writes.append({
-                "collection": "analyticalDashboards",
-                "backup": dashboard_entity,
-                "proposed": proposed_dashboard,
-                "checks": dashboard_checks,
-            })
+        # Write dashboard config cleanup first (primary, then siblings). If the following
+        # filterContext PUT fails, automatic rollback restores dashboards before exit.
+        if converted_local_ids:
+            # Stable order: primary dashboard first, then remaining ids sorted.
+            ordered_ids = [entity_id(dashboard_entity)] + sorted(
+                oid for oid in dashboards_by_id if oid != entity_id(dashboard_entity)
+            )
+            for dash_id in ordered_ids:
+                dash_entity = dashboards_by_id[dash_id]
+                proposed_dashboard = put_payload_from_entity(dash_entity)
+                dashboard_content = entity_content(proposed_dashboard)
+                removed = _remove_dashboard_attribute_filter_configs(
+                    dashboard_content,
+                    converted_local_ids,
+                )
+                for local_id in sorted(converted_local_ids):
+                    if json_contains_token(dashboard_content, local_id):
+                        raise TransformError(
+                            f"Converted dashboard filter {local_id} is still referenced "
+                            f"outside supported attributeFilterConfigs on dashboard {dash_id}"
+                        )
+                if removed:
+                    planned_writes.append({
+                        "collection": "analyticalDashboards",
+                        "backup": dash_entity,
+                        "proposed": proposed_dashboard,
+                        "checks": [{
+                            "kind": "dashboard_attribute_filter_configs_removed",
+                            "local_identifiers": sorted(converted_local_ids),
+                        }],
+                    })
+
         if changed:
             planned_writes.append({
                 "collection": "filterContexts",
@@ -763,7 +847,11 @@ def transform_dashboard_filter_context(
                 "checks": context_checks,
             })
 
-        all_checks = dashboard_checks + context_checks
+        all_checks = [
+            check
+            for write in planned_writes
+            for check in (write.get("checks") or [])
+        ]
         # `proposed` remains the filter-context proposal for compatibility/debug output;
         # runner uses planned_writes for dashboard execution.
         return TransformResult(
@@ -829,6 +917,20 @@ def verify_checks(entity: dict[str, Any], checks: list[dict[str, Any]]) -> list[
                     f"{source}: expected one unrestricted target date filter, found {target_count}"
                 )
 
+        elif kind == "removed_source_attribute_filter":
+            source_count = 0
+            for _, wrapper in filter_rows(content):
+                src, _ = attribute_filter_source(wrapper)
+                if src == source_label:
+                    source_count += 1
+            if source_count:
+                issues.append(f"{source}: legacy source attribute filter still exists after drop")
+            local_id = str(check.get("local_identifier") or "")
+            if local_id and local_id in set(_dashboard_config_local_ids(content)):
+                issues.append(
+                    f"{source}: attributeFilterConfigs still contains dropped localIdentifier {local_id}"
+                )
+
         elif kind == "dashboard_unrestricted_date_filter":
             source_count = 0
             target_count = 0
@@ -854,6 +956,15 @@ def verify_checks(entity: dict[str, Any], checks: list[dict[str, Any]]) -> list[
                 issues.append(
                     f"{source}: expected one unrestricted dashboard target date filter, found {target_count}"
                 )
+
+        elif kind == "removed_dashboard_attribute_filter":
+            source_count = 0
+            for _, wrapper in filter_rows(content):
+                src, _ = _dashboard_attribute_filter_source(wrapper)
+                if src == source_label:
+                    source_count += 1
+            if source_count:
+                issues.append(f"{source}: legacy dashboard attribute filter still exists after drop")
 
         elif kind == "dashboard_attribute_filter_configs_removed":
             remaining = set(_dashboard_config_local_ids(content))

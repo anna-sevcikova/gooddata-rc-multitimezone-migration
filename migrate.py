@@ -222,6 +222,204 @@ def cmd_self_test(_: argparse.Namespace) -> None:
     assert filters[1]["relativeDateFilter"]["from"] == -29
     assert not verify_checks(result.proposed, result.checks)
 
+    # Visualization filter: drop when target date dataset already has a date filter;
+    # also strip obsolete attributeFilterConfigs.
+    vis_f_drop = synthetic_entity(
+        "v3b", "visualizationObject", "Filter drop",
+        {
+            "buckets": [{
+                "localIdentifier": "view",
+                "items": [{"attribute": {
+                    "localIdentifier": "f",
+                    "displayForm": {"identifier": {"id": "old.filter", "type": "label"}},
+                }}],
+            }],
+            "filters": [
+                {"negativeAttributeFilter": {
+                    "localIdentifier": "af1",
+                    "displayForm": {"identifier": {"id": "old.filter", "type": "label"}},
+                    "notIn": {"values": ["N/A"]},
+                }},
+                {"relativeDateFilter": {
+                    "dataSet": {"identifier": {"id": "dt_callstartdate", "type": "dataset"}},
+                    "granularity": "GDC.time.date",
+                    "from": -6,
+                    "to": 0,
+                }},
+            ],
+            "attributeFilterConfigs": {
+                "af1": {"mode": "active"},
+            },
+            "sorts": [],
+            "properties": {},
+        },
+    )
+    result = transform_visualization(
+        vis_f_drop, [scope_row(2, "old.filter", "Filter drop", "visualization")], {"old.filter": rf}
+    )
+    assert result.changed and not result.blocked
+    filters = entity_content(result.proposed)["filters"]
+    assert len(filters) == 1
+    assert filters[0]["relativeDateFilter"]["from"] == -6
+    assert entity_content(result.proposed).get("attributeFilterConfigs") == {}
+    assert any("Drop source attribute filter" in o.detail for o in result.outcomes)
+    assert not verify_checks(result.proposed, result.checks)
+
+    # Visualization filter: convert + strip attributeFilterConfigs when no date filter yet.
+    vis_f_cfg = synthetic_entity(
+        "v3c", "visualizationObject", "Filter configs",
+        {
+            "buckets": [{
+                "localIdentifier": "view",
+                "items": [{"attribute": {
+                    "localIdentifier": "f",
+                    "displayForm": {"identifier": {"id": "old.filter", "type": "label"}},
+                }}],
+            }],
+            "filters": [
+                {"negativeAttributeFilter": {
+                    "localIdentifier": "af1",
+                    "displayForm": {"identifier": {"id": "old.filter", "type": "label"}},
+                    "notIn": {"values": ["N/A"]},
+                }},
+            ],
+            "attributeFilterConfigs": {
+                "af1": {"mode": "active"},
+            },
+            "sorts": [],
+            "properties": {},
+        },
+    )
+    result = transform_visualization(
+        vis_f_cfg, [scope_row(2, "old.filter", "Filter configs", "visualization")], {"old.filter": rf}
+    )
+    assert result.changed and not result.blocked
+    filters = entity_content(result.proposed)["filters"]
+    assert filters[0]["relativeDateFilter"]["dataSet"]["identifier"]["id"] == "dt_callstartdate"
+    assert entity_content(result.proposed).get("attributeFilterConfigs") == {}
+    assert any("attributeFilterConfigs" in o.detail for o in result.outcomes)
+    assert not verify_checks(result.proposed, result.checks)
+
+    # Case B with two identical source fields: reuse DAY once, delete both copies.
+    vis_b2 = synthetic_entity(
+        "v2b", "visualizationObject", "Case B dup",
+        {
+            "buckets": [{
+                "localIdentifier": "view",
+                "items": [
+                    {"attribute": {
+                        "localIdentifier": "day1",
+                        "displayForm": {"identifier": {"id": "new.day", "type": "label"}},
+                        "alias": "Date",
+                    }},
+                    {"attribute": {
+                        "localIdentifier": "legacy1",
+                        "displayForm": {"identifier": {"id": "old.time", "type": "label"}},
+                    }},
+                    {"attribute": {
+                        "localIdentifier": "legacy2",
+                        "displayForm": {"identifier": {"id": "old.time", "type": "label"}},
+                    }},
+                ],
+            }],
+            "filters": [],
+            "sorts": [],
+            "properties": {},
+        },
+    )
+    result = transform_visualization(
+        vis_b2, [scope_row(2, "old.time", "Case B dup", "visualization")], {"old.time": rb}
+    )
+    assert result.changed and not result.blocked
+    attrs = list(iter_attribute_items(entity_content(result.proposed)))
+    assert len(attrs) == 1
+    assert attrs[0][4]["localIdentifier"] == "day1"
+    assert display_form_id(attrs[0][4]) == "new.second"
+    assert any("remove 2 source field" in o.detail for o in result.outcomes)
+    assert not verify_checks(result.proposed, result.checks)
+
+    # Multiple scoped sources claiming the same DAY -> Case C (keep day, replace in place).
+    rb_hour = rule(
+        "old.hour", "new", "HOUR_OF_DAY", "Old Hour",
+        day_reuse=True, day_granularity="HOUR", day_title="Started Hour",
+    )
+    vis_multi = synthetic_entity(
+        "v2c", "visualizationObject", "Multi source",
+        {
+            "buckets": [{
+                "localIdentifier": "view",
+                "items": [
+                    {"attribute": {
+                        "localIdentifier": "day1",
+                        "displayForm": {"identifier": {"id": "new.day", "type": "label"}},
+                        "alias": "Date",
+                    }},
+                    {"attribute": {
+                        "localIdentifier": "legacy_time",
+                        "displayForm": {"identifier": {"id": "old.time", "type": "label"}},
+                    }},
+                    {"attribute": {
+                        "localIdentifier": "legacy_hour",
+                        "displayForm": {"identifier": {"id": "old.hour", "type": "label"}},
+                    }},
+                ],
+            }],
+            "filters": [],
+            "sorts": [],
+            "properties": {},
+        },
+    )
+    result = transform_visualization(
+        vis_multi,
+        [
+            scope_row(2, "old.time", "Multi source", "visualization"),
+            scope_row(3, "old.hour", "Multi source", "visualization"),
+        ],
+        {"old.time": rb, "old.hour": rb_hour},
+    )
+    assert result.changed and not result.blocked
+    attrs = {a[4]["localIdentifier"]: a[4] for a in iter_attribute_items(entity_content(result.proposed))}
+    assert display_form_id(attrs["day1"]) == "new.day"
+    assert display_form_id(attrs["legacy_time"]) == "new.secondOfDay"
+    assert display_form_id(attrs["legacy_hour"]) == "new.hourOfDay"
+    assert all("Case C" in o.detail for o in result.outcomes if o.status == "READY")
+
+    # More than one DAY field -> Case C (do not reuse).
+    vis_days = synthetic_entity(
+        "v2d", "visualizationObject", "Multi day",
+        {
+            "buckets": [{
+                "localIdentifier": "view",
+                "items": [
+                    {"attribute": {
+                        "localIdentifier": "day1",
+                        "displayForm": {"identifier": {"id": "new.day", "type": "label"}},
+                    }},
+                    {"attribute": {
+                        "localIdentifier": "day2",
+                        "displayForm": {"identifier": {"id": "new.day", "type": "label"}},
+                    }},
+                    {"attribute": {
+                        "localIdentifier": "legacy",
+                        "displayForm": {"identifier": {"id": "old.time", "type": "label"}},
+                    }},
+                ],
+            }],
+            "filters": [],
+            "sorts": [],
+            "properties": {},
+        },
+    )
+    result = transform_visualization(
+        vis_days, [scope_row(2, "old.time", "Multi day", "visualization")], {"old.time": rb}
+    )
+    assert result.changed and not result.blocked
+    attrs = {a[4]["localIdentifier"]: a[4] for a in iter_attribute_items(entity_content(result.proposed))}
+    assert display_form_id(attrs["day1"]) == "new.day"
+    assert display_form_id(attrs["day2"]) == "new.day"
+    assert display_form_id(attrs["legacy"]) == "new.secondOfDay"
+    assert any("Case C" in o.detail for o in result.outcomes)
+
     # Dashboard -> dedicated filterContext conversion using the real Cloud entity shape:
     # filterContext.attributeFilter/dateFilter plus dashboard attributeFilterConfigs.
     dashboard = synthetic_entity(
@@ -288,6 +486,34 @@ def cmd_self_test(_: argparse.Namespace) -> None:
     assert converted["localIdentifier"] == "daf1"
     assert "from" not in converted and "to" not in converted
     assert not verify_checks(context_write["proposed"], context_write["checks"])
+
+    # Shared filterContext: clean attributeFilterConfigs on sibling dashboards too.
+    dashboard_b = synthetic_entity(
+        "d2", "analyticalDashboard", "Dashboard B",
+        {
+            "filterContextRef": {"identifier": {"id": "fc1", "type": "filterContext"}},
+            "attributeFilterConfigs": [
+                {"localIdentifier": "daf1", "selectionType": "listOrText"},
+            ],
+            "layout": {"type": "IDashboardLayout", "sections": []},
+        },
+    )
+    filter_context_shared = copy.deepcopy(filter_context)
+    result = transform_dashboard_filter_context(
+        dashboard,
+        filter_context_shared,
+        [scope_row(2, "old.filter", "Dashboard", "dashboard")],
+        {"old.filter": rf},
+        sibling_dashboards=[dashboard_b],
+    )
+    assert result.changed and not result.blocked
+    assert len(result.planned_writes) == 3
+    collections = [w["collection"] for w in result.planned_writes]
+    assert collections.count("analyticalDashboards") == 2
+    assert collections.count("filterContexts") == 1
+    for write in result.planned_writes:
+        if write["collection"] == "analyticalDashboards":
+            assert entity_content(write["proposed"])["attributeFilterConfigs"] == []
 
     # V1.4 discovery: multiple legacy sources in one visualization, including a
     # source_attribute != source_label case. This reproduces the missed-scope class
@@ -465,8 +691,13 @@ def cmd_self_test(_: argparse.Namespace) -> None:
     print("- visualization Case C")
     print("- visualization Case B DAY reuse")
     print("- visualization Case B leftover localIdentifier remap (sort/config)")
+    print("- visualization Case B duplicate source fields (reuse once, drop copies)")
+    print("- visualization Case C fallback for multi-source / multi-DAY reuse collision")
     print("- visualization attribute_filter -> unrestricted date filter")
+    print("- visualization attribute_filter drop when target date filter exists")
+    print("- visualization attribute_filter convert + attributeFilterConfigs cleanup")
     print("- dashboard filterContext conversion + dashboard config cleanup")
+    print("- dashboard shared filterContext migrates once + sibling config cleanup")
     print("- scope discovery + unscoped-known-legacy diagnostics")
     print("- raw Platform export + normalized scope input compatibility")
     print("- discover entry points + graph candidate extraction")

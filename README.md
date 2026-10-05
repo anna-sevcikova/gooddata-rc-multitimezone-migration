@@ -1,4 +1,4 @@
-# GoodData Time Migration Tool v1.4.1
+# GoodData Time Migration Tool v1.4.2
 
 Python-first GoodData time migration tool using individual Entity API operations. Analytics as Code is not required.
 
@@ -230,15 +230,17 @@ This is deliberate: **discovery proposes scope; scope authorizes migration**.
 
 ## Existing migration behavior
 
-V1.4.1 preserves the existing rules and safety semantics, including:
+V1.4.2 preserves the existing rules and safety semantics, including:
 
-- exact title + category lookup,
-- Case A/B/C/D visualization coexistence handling,
+- exact title + category lookup (with whitespace-tolerant title verify after ID lookup),
+- Case A/B/C/D visualization coexistence handling (Case C fallback on Case B collisions),
+- Case B many-copy collapse for the same source field,
 - exact metric MAQL token replacement,
 - visualization legacy attribute filter -> unrestricted date filter,
-- dashboard `filterContext` conversion,
-- dashboard `attributeFilterConfigs` cleanup,
-- existing date filters immutable,
+- visualization filter drop when target date already exists + `attributeFilterConfigs` cleanup,
+- dashboard `filterContext` conversion (including shared contexts),
+- dashboard `attributeFilterConfigs` cleanup on all consumer dashboards,
+- existing date filters immutable (never duplicated),
 - target dataset/label validation,
 - individual Entity API PUTs only,
 - concurrency check, GET verification and rollback,
