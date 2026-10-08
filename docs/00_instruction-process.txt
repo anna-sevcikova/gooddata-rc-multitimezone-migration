@@ -11,6 +11,10 @@ python3 migrate.py self-test
 export GD_HOST="https://ringcentral-dev.cloud.gooddata.com"
 export GD_WORKSPACE="<TEST_WORKSPACE_ID>"
 
+----------------------
+- automaticke spusteni pres scripts - ./scripts/run-clients-serially.sh
+- updatovat seznam predtim!
+
 read -s GD_TOKEN
 export GD_TOKEN
 #pustit a vlozit token, pro restore -> unset GD_TOKEN
